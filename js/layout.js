@@ -63,12 +63,12 @@ const ZEMIN = {
     { type: 'roundTable', x: -6.5, z: -7.4, r: 1.1, seats: 7, zone: 'meeting' },
     { type: 'screen', x: -6.5, z: -9.85, w: 2.0 },
     { type: 'execDesk', x: 1, z: -7.4, face: 0, deskNo: 102, name: 'Müdür masası (sağ)', guests: 2 },
-    // Orta: üç adet 8 kişilik masa grubu (4 karşı 4), aralarında dolaplar
+    // Orta: Masa 1 (8), Masa 2 (6), Masa 3 (8) — karşılıklı; aralarında dolaplar
     { type: 'bench', x: -13, z: 0.5, modules: 4, deskStart: 1, group: 'Masa 1' },
     { type: 'lockers', x: -9.75, z: 0.5, w: 0.8, d: 6.0 },
-    { type: 'bench', x: -6.5, z: 0.5, modules: 4, deskStart: 9, group: 'Masa 2' },
+    { type: 'bench', x: -6.5, z: 0.5, modules: 3, deskStart: 9, group: 'Masa 2' },
     { type: 'lockers', x: -3.25, z: 0.5, w: 0.8, d: 6.0 },
-    { type: 'bench', x: 0, z: 0.5, modules: 4, deskStart: 17, group: 'Masa 3' },
+    { type: 'bench', x: 0, z: 0.5, modules: 4, deskStart: 15, group: 'Masa 3' },
     // Alt orta: yönetici masası (ofise bakar)
     { type: 'execDesk', x: -6.5, z: 6.6, face: Math.PI, deskNo: 103, name: 'Yönetici masası', guests: 2 },
     { type: 'column', x: -10.6, z: -3.9 }, { type: 'column', x: -2.4, z: -3.9 },
@@ -93,7 +93,7 @@ const ZEMIN = {
       { x: 11.2, z: 5.1, face: 0 }, { x: 12.6, z: 5.1, face: 0 }, { x: 14.0, z: 5.1, face: 0 }] },
   ],
   labels: [
-    { text: 'MASA 1', x: -13, z: -3.3, h: 0.42 }, { text: 'MASA 2', x: -6.5, z: -3.3, h: 0.42 }, { text: 'MASA 3', x: 0, z: -3.3, h: 0.42 },
+    { text: 'MASA 1', x: -13, z: -3.3, h: 0.42 }, { text: 'MASA 2', x: -6.5, z: -2.5, h: 0.42 }, { text: 'MASA 3', x: 0, z: -3.3, h: 0.42 },
     { text: 'MÜDÜR', x: -14, z: -4.9, h: 0.38 }, { text: 'MÜDÜR', x: 1, z: -4.9, h: 0.38 }, { text: 'YÖNETİCİ', x: -6.5, z: 4.5, h: 0.38 },
     { text: 'TOPLANTI', x: -6.5, z: -5.0, h: 0.4 }, { text: 'MOLA', x: -15.8, z: 5.6, h: 0.42 },
     { text: 'ÜRETİM TEKNOLOJİLERİ VE BAKIM', x: 12, z: 1.6, h: 0.55 }, { text: 'GİRİŞ', x: -6.5, z: 11.3, h: 0.45 },
