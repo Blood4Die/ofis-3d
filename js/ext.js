@@ -323,6 +323,7 @@ export function initExt(ctx) {
         <div><span class="muted small">Kullanıcı sınırı</span><input type="number" id="maxU" min="1" max="200" value="${esc(settings.max_users || '20')}" /><button id="saveMax">Kaydet</button></div>
         <div><span class="muted small">E-posta bildirimleri</span><label class="sw-tg"><input type="checkbox" id="mailOn" ${settings.email_enabled === '1' ? 'checked' : ''}/> Açık</label><span class="muted small">Brevo anahtarı tanımlanana kadar e-posta gitmez.</span></div>
       </section>
+      ${ctx.h.sched?.()?.editorHtml() ?? ''}
       <div class="adm-wrap"><table class="adm">
         <thead><tr><th>Kişi</th><th>Görev / unvan</th><th>Rol</th><th>Kapasite</th><th>E-posta</th><th>Son giriş</th><th>Masa</th><th>Bildirim</th><th title="Sistem yöneticisi: kullanıcı ve ayar yönetimi">Sistem yön.</th><th>Aktif</th><th></th></tr></thead>
         <tbody>${users.map((u) => `<tr class="${u.active === false ? 'off' : ''}" data-u="${esc(u.id)}">
@@ -342,6 +343,7 @@ export function initExt(ctx) {
     const copy = (txt) => navigator.clipboard?.writeText(txt).then(() => toast('📋 Kopyalandı'), () => toast(txt));
     $('#cpInv', mbody).onclick = () => copy(settings.invite_code);
     $('#rotInv', mbody).onclick = () => confirm('Davet kodu yenilensin mi? Eski kod artık çalışmaz.') && call('rotate_invite', {}, '🔁 Yeni davet kodu oluşturuldu');
+    ctx.h.sched?.()?.bindEditor(mbody, renderAdmin);
     $('#saveMax', mbody).onclick = () => call('set_setting', { key: 'max_users', value: $('#maxU', mbody).value }, 'Kaydedildi');
     $('#mailOn', mbody).onchange = (e) => call('set_setting', { key: 'email_enabled', value: e.target.checked ? '1' : '0' }, e.target.checked ? 'E-posta açık' : 'E-posta kapalı');
     const cp = $('#cpPw', mbody); if (cp) cp.onclick = () => copy(X.tempPw.pw);

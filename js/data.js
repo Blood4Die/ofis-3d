@@ -2,7 +2,7 @@
 // SupabaseBackend (gerçek) ve DemoBackend (yerel, sekmeler arası) aynı metotları sunar.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
-export const EXT_TABLES = ['task_comments', 'task_followers', 'task_attachments', 'room_bookings', 'leaves', 'task_templates', 'projects', 'actions', 'checkins'];
+export const EXT_TABLES = ['task_comments', 'task_followers', 'task_attachments', 'room_bookings', 'leaves', 'task_templates', 'projects', 'actions', 'checkins', 'office_schedule'];
 const todayStr = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD yerel saat
 
 // ---------------------------------------------------------------- Supabase
