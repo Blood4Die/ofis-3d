@@ -4,6 +4,7 @@ import { Office, AvatarPreview } from './office.js';
 import { initExt } from './ext.js';
 import { initPano } from './pano.js';
 import { initAsakai } from './asakai.js';
+import { initSchedule } from './schedule.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -32,7 +33,7 @@ async function guard(fn) {
   try { await fn(); } catch (e) { console.error(e); toast('⚠️ ' + (e.message || 'İşlem başarısız')); }
 }
 const openCount = (id) => ak?.connected ? ak.planCount(id) : [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti').length;
-let ext = null, pano = null, ak = null; // aşağıda, yardımcılar tanımlandıktan sonra başlatılır
+let ext = null, pano = null, ak = null, sched = null; // aşağıda, yardımcılar tanımlandıktan sonra başlatılır
 
 // ---------------------------------------------------------------- Giriş
 $$('.auth-tabs button').forEach((b) => b.onclick = () => {
@@ -75,14 +76,14 @@ async function start() {
     onProfile: onProfileChange, onTask: onTaskChange, onActivity: (row) => addFeed(row, true),
     onPresence: (set) => { const same = set.size === S.online.size && [...set].every((x) => S.online.has(x)); S.online = set; if (!same) refreshOnline(); },
     onMessage: onMessage,
-    onTable: (t, c) => { ext.onTable(t, c); pano.onTable(t, c); },
+    onTable: (t, c) => { ext.onTable(t, c); pano.onTable(t, c); sched.onTable(t, c); },
     onConnection: (state, wasReconnect) => {
       $('#conn').classList.toggle('off', state !== 'online');
       $('#offlineBanner').hidden = state === 'online';
       if (state === 'online' && wasReconnect) reloadAll(true).catch(console.error);
     },
   });
-  setInterval(tickClock, 15000); tickClock();
+  await sched.load(); setInterval(tickClock, 15000); tickClock();
   initPush().catch(console.warn);
   await ext.load().catch(console.warn);
   await pano.load().catch(console.warn);
@@ -173,7 +174,7 @@ $('#statusNote').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.t
 $('#statusNote').addEventListener('change', (e) => guard(() => api.updateProfile({ status_note: e.target.value.trim() })));
 function renderMe() { const m = meP(); $('#meBtn').innerHTML = `<span class="dot" style="display:inline-block;background:${esc(m.color)}"></span> ${esc(m.display_name)}`; }
 $('#meBtn').onclick = () => selectPerson(S.me);
-function tickClock() { $('#clock').textContent = new Date().toLocaleString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+function tickClock() { sched?.tick(); $('#clock').textContent = new Date().toLocaleString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
 
 // ---------------------------------------------------------------- Ekip
 function renderTeam() {
@@ -580,8 +581,9 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--tb', $('#
 
 // ---------------------------------------------------------------- Genişletilmiş özellikler
 ext = initExt({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, hhmm, fmtDate, todayStr, canEdit, canDelete, renderTasks: () => { renderTasks(); pano?.render(); }, renderTeam,
-  projectOf: (id) => pano?.project(id), projects: () => pano?.projects || [], ak: () => ak } });
+  projectOf: (id) => pano?.project(id), projects: () => pano?.projects || [], ak: () => ak, sched: () => sched } });
 pano = initPano({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, todayStr, renderTasks: () => { renderTasks(); renderTaskFormProjects(); }, openTask: (id) => ext.openTask(id), leaveToday: (id) => ext.leaveToday(id) } });
+sched = initSchedule({ api, h: { $, $$, esc, toast, chime: () => chime(false) } });
 ak = initAsakai({ S, api, office, h: { $, $$, esc, toast, myEmail: () => api.user?.email || '',
   onChange: () => { renderTeam(); if (S.selected && S.selected !== S.me) selectPerson(S.selected, false); } } });
 function renderTaskFormProjects() {

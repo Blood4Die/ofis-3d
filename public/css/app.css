@@ -589,3 +589,28 @@ a.msg-btn { display: inline-flex; align-items: center; justify-content: center; 
 .ak-card li.done { color: var(--muted); }
 .al-flag:empty { display: none; }
 @media (max-width: 900px) { .ak-box { width: 28px; height: 28px; } }
+
+/* ---------- Mesai / mola ---------- */
+.sched-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; white-space: nowrap; background: #eef1f6; color: var(--ink); cursor: default; }
+.sched-chip:empty { display: none; }
+.sched-chip b { font-weight: 700; }
+.sched-chip .sc-sub { color: var(--muted); }
+.sched-chip.work { background: #e7f8ef; } .sched-chip.work b { color: #1c8f58; }
+.sched-chip.break { background: #fff3dd; animation: schPulse 2.4s ease-in-out infinite; } .sched-chip.break b { color: #b86e00; }
+.sched-chip.off { background: #eef1f6; } .sched-chip.off b { color: var(--muted); }
+@keyframes schPulse { 50% { box-shadow: 0 0 0 4px rgba(246, 166, 35, .18); } }
+.adm-sched { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.adm-sched h4 { margin: 0 0 8px; }
+.sch-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.3fr); gap: 14px; }
+.sch-days { display: grid; gap: 4px; }
+.sch-day { display: grid; grid-template-columns: 18px 82px auto 10px auto; align-items: center; gap: 6px; font-size: 13px; }
+.sch-day.off span { color: var(--muted); }
+.sch-brs { display: grid; gap: 5px; align-content: start; }
+.sch-br { display: grid; grid-template-columns: 52px 1fr auto 10px auto 28px; align-items: center; gap: 6px; }
+.sch-br button { border: none; background: none; color: #b2bac6; } .sch-br button:hover { color: var(--bad); }
+.sch-act { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.sch-day input[type=time], .sch-br input[type=time] { padding: 3px 4px; font-size: 12.5px; min-width: 96px; }
+@media (max-width: 900px) {
+  .sch-grid { grid-template-columns: 1fr; }
+  .sched-chip .sc-sub { display: none; }
+}
