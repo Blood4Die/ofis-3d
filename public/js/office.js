@@ -403,6 +403,7 @@ export class Office {
     if (!this.floors.has(id)) return;
     this.active = id;
     this.floors.forEach((f, k) => { f.group.visible = k === id; });
+    if (this.roomSign) this.roomSign.visible = this.roomSign.userData.floor === id;
     this.avatars.forEach((a) => this._attach(a));
     this.onFloorsChanged?.();
   }
@@ -542,6 +543,22 @@ export class Office {
     if (a.visible && !a.target?.hide) a.opacityGoal = online ? 1 : 0.35;
   }
   setTaskCount(id, n) { const a = this.avatars.get(id); if (!a) return; const b = a.el.querySelector('.al-badge'); b.hidden = !n; b.textContent = n; }
+  // Toplantı odası tabelası (rezervasyon durumu)
+  setRoomSign(html, busy) {
+    const list = this.zones.get('meeting'); if (!list?.length) return;
+    if (!this.roomSign) {
+      const fl = list[0].floor, xs = list.map((s) => s.spot.x), zs = list.map((s) => s.spot.z);
+      const el = document.createElement('div'); el.className = 'room-sign';
+      el.addEventListener('pointerup', (e) => { e.stopPropagation(); this.onRoomClick?.(); });
+      this.roomSign = new CSS2DObject(el); this.roomSign.center.set(0.5, 1);
+      this.roomSign.position.set((Math.min(...xs) + Math.max(...xs)) / 2, 2.6, Math.min(...zs) - 0.6);
+      this.floors.get(fl).group.add(this.roomSign); this.roomSign.userData.floor = fl;
+    }
+    this.roomSign.element.innerHTML = html;
+    this.roomSign.element.classList.toggle('busy', !!busy);
+    this.roomSign.visible = this.roomSign.userData.floor === this.active;
+  }
+
   // Avatarın üstünde konuşma balonu (genel mesaj) ya da 💬 işareti (özel mesaj)
   say(id, text, { private: priv = false, ms = 6500 } = {}) {
     const a = this.avatars.get(id); if (!a || !a.visible) return;

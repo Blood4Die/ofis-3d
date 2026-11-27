@@ -51,5 +51,14 @@ Genel (herkes) ve kişiden kişiye özel mesaj. Tablo `messages` (`recipient` nu
 - 🚨 Acil mesaj: alıcıda tam ekran kırmızı uyarı + tekrarlayan alarm; sistem bildirimi tıklanana kadar ekranda kalır (`requireInteraction`).
 - iPhone: yalnız "Ana Ekrana Ekle" ile kurulmuş uygulamada (iOS 16.4+) çalışır.
 
+## Yönetim ve görev özellikleri
+- **Yönetici paneli** (☰ → 🛡️): kullanıcı listesi, ad/masa düzenleme, yönetici yetkisi, hesabı pasife alma (giriş engellenir, veri silinmez), geçici şifre üretme, davet kodu yenileme, kullanıcı sınırı, e-posta aç/kapa. Edge Function `admin` (çağıranın `is_admin` olduğu doğrulanır).
+- **Görev detayı** (görev başlığına tıkla): açıklama, kategori, kontrol listesi (`tasks.checklist`), dosya ekleri (Storage `task-files`, özel, 10 MB), takipçiler, yorumlar. Yorumlar atanan, oluşturan ve takipçilere push olarak gider.
+- **Kategori**: görev formunda ve detayda; görev panelinde kategori filtresi.
+- **Tekrarlayan görevler** (☰ → 🔁): `task_templates`; pg_cron her gün 06:00 (TR) `create_recurring_tasks()`; istemci açılışta `run_recurring_today()` çağırır (aynı gün ikinci kez oluşturmaz).
+- **Toplantı odası** (☰ → 📅 veya 3D'deki tabelaya tıkla): `room_bookings`, çakışma veritabanında `exclude` kısıtıyla engellenir; 3D tabela dolu/boş gösterir.
+- **İzin takvimi** (☰ → 🏖️): `leaves`; aylık takvim, ekip listesinde 🏖️.
+- **E-posta** (hazır, kapalı): Edge `push` (görev ataması) ve `digest` (hafta içi 08:30 özet + geciken/yarın terminli). Etkinleştirmek için: Brevo API anahtarı Edge secret `BREVO_API_KEY` olarak girilir ve panelden "E-posta bildirimleri: Açık" yapılır. Kullanıcı profilinden e-postayı kapatabilir.
+
 ## Avatar ve duygu durumu
 Kullanıcı ilk girişte avatarını oluşturur (ten, saç, saç rengi, aksesuar: gözlük/kulaklık/şapka/baret, kıyafet rengi). Duygu durumu (😄🔥🙂😐😴😣) avatarın yüz ifadesini ve hareketini değiştirir; `profiles.avatar` (jsonb) ve `profiles.mood`.

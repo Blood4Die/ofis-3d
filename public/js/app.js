@@ -1,6 +1,7 @@
 import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR, VAPID_PUBLIC } from './config.js';
 import { SupabaseBackend, DemoBackend, todayStr } from './data.js';
 import { Office, AvatarPreview } from './office.js';
+import { initExt } from './ext.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -11,13 +12,13 @@ const fmtDate = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('tr-TR', { 
 const isDemo = new URLSearchParams(location.search).has('demo');
 const api = isDemo ? new DemoBackend() : new SupabaseBackend();
 
-const S = { msgs: [], chatOpen: false, chatWith: null, me: null, profiles: new Map(), tasks: new Map(), online: new Set(), tab: 'bugun', onlyMine: false, selected: null, started: false };
+const S = { names: new Map(), cat: '', msgs: [], chatOpen: false, chatWith: null, me: null, profiles: new Map(), tasks: new Map(), online: new Set(), tab: 'bugun', onlyMine: false, selected: null, started: false };
 const office = new Office($('#scene'), { onAvatarClick: (id) => selectPerson(id), onFloorsChanged: () => renderFloors() });
 let preview = null;
 
 // ---------------------------------------------------------------- Yardımcılar
 const meP = () => S.profiles.get(S.me);
-const nameOf = (id) => S.profiles.get(id)?.display_name ?? '—';
+const nameOf = (id) => S.profiles.get(id)?.display_name ?? S.names.get(id) ?? '—';
 const canEdit = (t) => { const m = meP(); return !!m && (t.assignee === S.me || t.created_by === S.me || m.is_admin); };
 const canDelete = (t) => { const m = meP(); return !!m && (t.created_by === S.me || m.is_admin); };
 function toast(msg) {
@@ -29,6 +30,7 @@ async function guard(fn) {
   try { await fn(); } catch (e) { console.error(e); toast('⚠️ ' + (e.message || 'İşlem başarısız')); }
 }
 const openCount = (id) => [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti').length;
+let ext = null; // initExt aşağıda, yardımcılar tanımlandıktan sonra
 
 // ---------------------------------------------------------------- Giriş
 $$('.auth-tabs button').forEach((b) => b.onclick = () => {
@@ -61,7 +63,7 @@ async function start() {
   if (S.started) return;
   S.me = api.user.id;
   await reloadAll(false);
-  if (!meP()) { authErr('Profil bulunamadı. Yöneticiye başvurun.'); await api.signOut(); return; }
+  if (!meP()) { authErr('Profil bulunamadı veya hesabın pasif. Yöneticiye başvur.'); await api.signOut(); return; }
   S.started = true;
   $('#auth').hidden = true;
   ['#topbar', '#teamPanel', '#taskPanel', '#mobileTabs', '#fitBtnDesk'].forEach((s) => $(s).hidden = false);
@@ -71,6 +73,7 @@ async function start() {
     onProfile: onProfileChange, onTask: onTaskChange, onActivity: (row) => addFeed(row, true),
     onPresence: (set) => { S.online = set; refreshOnline(); },
     onMessage: onMessage,
+    onTable: (t, c) => ext.onTable(t, c),
     onConnection: (state, wasReconnect) => {
       $('#conn').classList.toggle('off', state !== 'online');
       $('#offlineBanner').hidden = state === 'online';
@@ -79,14 +82,16 @@ async function start() {
   });
   setInterval(tickClock, 15000); tickClock();
   initPush().catch(console.warn);
+  await ext.load().catch(console.warn);
   handleDeepLink(new URL(location.href));
 }
 
 async function reloadAll(animate) {
   const data = await api.loadAll();
-  const ids = new Set(data.profiles.map((p) => p.id));
+  data.profiles.forEach((p) => S.names.set(p.id, p.display_name));
+  const act = data.profiles.filter((p) => p.active !== false), ids = new Set(act.map((p) => p.id));
   S.profiles.forEach((_, id) => { if (!ids.has(id)) { S.profiles.delete(id); office.removePerson(id); } });
-  data.profiles.forEach((p) => { S.profiles.set(p.id, p); });
+  act.forEach((p) => { S.profiles.set(p.id, p); });
   S.tasks = new Map(data.tasks.map((t) => [t.id, t]));
   S.profiles.forEach((p) => office.upsertPerson(p, { animate, online: S.online.has(p.id), openTasks: openCount(p.id), isMe: p.id === S.me }));
   $('#feed').innerHTML = ''; data.activity.forEach((r) => addFeed(r, false));
@@ -97,7 +102,8 @@ async function reloadAll(animate) {
 
 // ---------------------------------------------------------------- Canlı olaylar
 function onProfileChange({ type, row, old }) {
-  if (type === 'DELETE') { S.profiles.delete(old.id); office.removePerson(old.id); }
+  if (row?.id) S.names.set(row.id, row.display_name);
+  if (type === 'DELETE' || row?.active === false) { const id = old?.id || row.id; S.profiles.delete(id); office.removePerson(id); if (id === S.me) { alert('Hesabın pasife alındı.'); api.signOut().then(() => location.reload()); return; } }
   else {
     S.profiles.set(row.id, row);
     office.upsertPerson(row, { animate: true, online: S.online.has(row.id), openTasks: openCount(row.id), isMe: row.id === S.me });
@@ -119,7 +125,7 @@ function onTaskChange({ type, row, old }) {
   }
   const affected = new Set([t?.assignee, prev?.assignee].filter(Boolean));
   affected.forEach((id) => office.setTaskCount(id, openCount(id)));
-  renderTeam(); renderTasks();
+  renderTeam(); renderTasks(); ext.refreshTask();
   if (S.selected && S.selected !== S.me) selectPerson(S.selected, false);
 }
 
@@ -172,7 +178,7 @@ function renderTeam() {
     const s = STATUSES[p.status] ?? STATUSES.musait, n = openCount(p.id), on = S.online.has(p.id);
     return `<li data-id="${esc(p.id)}" class="${on ? '' : 'off'} ${S.selected === p.id ? 'sel' : ''}" title="${on ? 'Çevrimiçi' : 'Çevrimdışı'}">
       <span class="dot" style="background:${esc(p.color)};${on ? '' : 'opacity:.35'}"></span>
-      <span class="mood" title="${esc(MOODS[p.mood || 'normal']?.label)}">${MOODS[p.mood || 'normal']?.icon ?? ''}</span><span class="nm">${esc(p.display_name)}${p.id === S.me ? ' <span class="muted">(sen)</span>' : ''}</span>
+      <span class="mood" title="${esc(MOODS[p.mood || 'normal']?.label)}">${MOODS[p.mood || 'normal']?.icon ?? ''}</span><span class="nm">${esc(p.display_name)}${p.id === S.me ? ' <span class="muted">(sen)</span>' : ''}${ext?.leaveToday(p.id) ? ' <span title="Bugün izinli">🏖️</span>' : ''}</span>
       ${n ? `<span class="cnt">${n} iş</span>` : ''}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></li>`;
   }).join('');
@@ -223,7 +229,7 @@ function selectPerson(id, focus = true) {
     pf.oninput = pf.onchange = () => preview.show(draft());
     pf.onsubmit = (e) => {
       e.preventDefault(); const d = draft();
-      guard(async () => { await api.updateProfile({ display_name: d.display_name, color: d.color, desk_no: d.desk_no, avatar: d.avatar }); toast('Profil kaydedildi'); });
+      guard(async () => { await api.updateProfile({ display_name: d.display_name, color: d.color, desk_no: d.desk_no, avatar: d.avatar, email_opt_out: !!pf.email_opt_out?.checked }); toast('Profil kaydedildi'); });
     };
   }
   renderTeam();
@@ -244,6 +250,7 @@ function editorHtml(p, takenDesks) {
       <div class="ed-row"><span>Kıyafet</span><input name="color" type="color" value="${esc(p.color)}" /></div>
       <div class="ed-row"><span>Masa</span><select name="desk_no">${office.deskNumbers.map((n) =>
         `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>${esc(office.deskName(n))}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select></div>
+      <label class="ed-row"><span>E-posta</span><span><input type="checkbox" name="email_opt_out" ${p.email_opt_out ? 'checked' : ''}/> Görev e-postası istemiyorum</span></label>
       <button class="primary" type="submit">Kaydet</button>
     </div></form>`;
 }
@@ -450,8 +457,9 @@ async function initPush() {
   }
 }
 function handleDeepLink(url) {
-  const c = url.searchParams.get('chat');
+  const c = url.searchParams.get('chat'), t = url.searchParams.get('task');
   if (c && S.started) openChat(c === 'genel' ? 'genel' : c);
+  if (t && S.started) ext.openTask(Number(t));
 }
 
 // ---------------------------------------------------------------- Acil mesaj: tam ekran uyarı + tekrarlayan alarm
@@ -485,6 +493,7 @@ function visibleTasks() {
   const today = todayStr(), weekAgo = Date.now() - 7 * 864e5;
   let list = [...S.tasks.values()];
   if (S.onlyMine) list = list.filter((t) => t.assignee === S.me || (!t.assignee && t.created_by === S.me));
+  if (S.cat) list = list.filter((t) => t.category === S.cat);
   if (S.tab === 'bugun') {
     list = list.filter((t) => t.kind === 'gunluk' && (t.state !== 'bitti' ? (!t.due_date || t.due_date <= today) : (t.done_at && new Date(t.done_at).toLocaleDateString('sv-SE') === today)));
     list.sort((a, b) => (a.state === 'bitti') - (b.state === 'bitti') || (b.assignee === S.me) - (a.assignee === S.me) || a.priority - b.priority);
@@ -509,15 +518,17 @@ function renderTasks() {
       : `<span>👤 ${esc(t.assignee ? nameOf(t.assignee) : 'Atanmamış')}</span>`;
     return `<li class="${t.state === 'bitti' ? 'done' : ''}">
       <button class="st ${t.state}" data-id="${t.id}" ${ed ? '' : 'disabled'} title="${TASK_STATES[t.state].label} → ${TASK_STATES[TASK_STATES[t.state].next].label}">${t.state === 'bitti' ? '✓' : t.state === 'suruyor' ? '▶' : ''}</button>
-      <div><div class="tt">${t.priority === 1 ? '<span class="p1">❗</span> ' : ''}${esc(t.title)}</div>
+      <div><div class="tt" data-open="${t.id}">${t.priority === 1 ? '<span class="p1">❗</span> ' : ''}${esc(t.title)}</div>
         <div class="meta">${asg}${t.due_date ? `<span class="${late ? 'late' : ''}">📅 ${fmtDate(t.due_date)}${late ? ' (gecikti)' : ''}</span>` : ''}
-        <span>${TASK_STATES[t.state].label}</span>${t.created_by !== t.assignee ? `<span>✍️ ${esc(nameOf(t.created_by))}</span>` : ''}</div></div>
+        <span>${TASK_STATES[t.state].label}</span>${t.created_by !== t.assignee ? `<span>✍️ ${esc(nameOf(t.created_by))}</span>` : ''}${ext ? ext.taskMeta(t) : ''}</div></div>
       ${canDelete(t) ? `<button class="del" data-id="${t.id}" title="Sil">🗑</button>` : '<span></span>'}</li>`;
   }).join('');
   $$('#taskList .st').forEach((b) => b.onclick = () => {
     const t = S.tasks.get(Number(b.dataset.id)) ?? S.tasks.get(b.dataset.id);
     guard(() => api.updateTask(t.id, { state: TASK_STATES[t.state].next }));
   });
+  $$('#taskList [data-open]').forEach((el) => el.onclick = () => ext.openTask(Number(el.dataset.open)));
+  renderCatFilter();
   $$('#taskList .asg').forEach((s) => s.onchange = () => {
     const id = Number(s.dataset.id);
     guard(() => api.updateTask(id, { assignee: s.value || null }));
@@ -527,6 +538,14 @@ function renderTasks() {
     if (confirm(`"${t.title}" silinsin mi? Bu geri alınamaz.`)) guard(() => api.deleteTask(t.id));
   });
 }
+
+function renderCatFilter() {
+  const sel = $('#catFilter'); if (!sel || !ext) return;
+  const cats = ext.categories(), cur = S.cat;
+  sel.innerHTML = '<option value="">Tüm kategoriler</option>' + cats.map((c) => `<option ${c === cur ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  sel.hidden = !cats.length;
+}
+$('#catFilter').onchange = (e) => { S.cat = e.target.value; renderTasks(); };
 
 function renderAssigneeSelect() {
   const sel = $('#taskForm [name=assignee]'), cur = sel.value || S.me;
@@ -539,9 +558,9 @@ $('#taskForm [name=due_date]').value = todayStr();
 $('#taskForm').onsubmit = (e) => {
   e.preventDefault(); const f = new FormData(e.target);
   const task = { title: f.get('title').trim(), kind: f.get('kind'), assignee: f.get('assignee') || null,
-    due_date: f.get('due_date') || null, priority: Number(f.get('priority')) };
+    due_date: f.get('due_date') || null, priority: Number(f.get('priority')), category: (f.get('category') || '').trim() || null };
   if (!task.title) return;
-  guard(async () => { await api.addTask(task); e.target.title.value = ''; e.target.title.focus(); });
+  guard(async () => { await api.addTask(task); e.target.title.value = ''; e.target.title.focus(); ext.renderCatList(); });
 };
 
 // ---------------------------------------------------------------- Mobil
@@ -550,6 +569,9 @@ $$('#mobileTabs button[data-panel]').forEach((b) => b.onclick = () => {
   const p = $('#' + b.dataset.panel), open = !p.classList.contains('open');
   $$('.panel').forEach((x) => x.classList.remove('open')); if (open) p.classList.add('open');
 });
+
+// ---------------------------------------------------------------- Genişletilmiş özellikler
+ext = initExt({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, hhmm, fmtDate, todayStr, canEdit, canDelete, renderTasks, renderTeam } });
 
 // ---------------------------------------------------------------- Açılış
 (async () => {
