@@ -117,3 +117,29 @@ input:focus, select:focus { outline: 2px solid #b9cdf7; border-color: var(--acce
   .mobile-tabs { display: flex; position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); gap: 6px; z-index: 6; }
   .mobile-tabs button { box-shadow: var(--shadow); }
 }
+
+/* Duygu durumu */
+.mood-picker { display: flex; gap: 2px; background: #f1f4f8; border-radius: 999px; padding: 2px; }
+.mood-picker button { border: none; background: transparent; padding: 3px 6px; font-size: 16px; border-radius: 999px; filter: grayscale(0.7); opacity: .7; }
+.mood-picker button.active { background: #fff; filter: none; opacity: 1; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.team .mood { font-size: 15px; width: 18px; text-align: center; }
+.al-mood { font-size: 14px; }
+
+/* Kat seçici */
+.floor-tabs { position: fixed; top: 72px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: var(--panel);
+  padding: 4px; border-radius: 999px; box-shadow: var(--shadow); z-index: 5; }
+.floor-tabs button { border: none; border-radius: 999px; }
+.floor-tabs button.active { background: #1d2433; color: #fff; }
+
+/* Avatar düzenleyici */
+.card { width: min(560px, 94vw); }
+.editor { display: grid; grid-template-columns: 220px 1fr; gap: 12px; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.editor canvas { width: 220px; height: 260px; background: radial-gradient(circle at 50% 40%, #f4f7fb, #e3e9f1); border-radius: 12px; }
+.ed-fields { display: grid; gap: 7px; align-content: start; }
+.ed-row { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.ed-row input[type=color] { width: 44px; height: 30px; padding: 2px; }
+.sw { display: flex; gap: 6px; flex-wrap: wrap; }
+.sw input { display: none; }
+.sw i { display: block; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #cfd6df; cursor: pointer; }
+.sw input:checked + i { box-shadow: 0 0 0 2px var(--accent); }
+@media (max-width: 600px) { .editor { grid-template-columns: 1fr; } .editor canvas { margin: 0 auto; } }

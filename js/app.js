@@ -1,6 +1,6 @@
-import { STATUSES, TASK_STATES } from './config.js';
+import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR } from './config.js';
 import { SupabaseBackend, DemoBackend, todayStr } from './data.js';
-import { Office, DESK_COUNT } from './office.js';
+import { Office, AvatarPreview } from './office.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -12,7 +12,8 @@ const isDemo = new URLSearchParams(location.search).has('demo');
 const api = isDemo ? new DemoBackend() : new SupabaseBackend();
 
 const S = { me: null, profiles: new Map(), tasks: new Map(), online: new Set(), tab: 'bugun', onlyMine: false, selected: null, started: false };
-const office = new Office($('#scene'), { onAvatarClick: (id) => selectPerson(id) });
+const office = new Office($('#scene'), { onAvatarClick: (id) => selectPerson(id), onFloorsChanged: () => renderFloors() });
+let preview = null;
 
 // ---------------------------------------------------------------- Yardımcılar
 const meP = () => S.profiles.get(S.me);
@@ -63,7 +64,8 @@ async function start() {
   S.started = true;
   $('#auth').hidden = true;
   ['#topbar', '#teamPanel', '#taskPanel', '#mobileTabs'].forEach((s) => $(s).hidden = false);
-  buildStatusPicker(); renderMe();
+  buildStatusPicker(); renderMe(); renderFloors();
+  if (!meP().avatar || !Object.keys(meP().avatar).length) { selectPerson(S.me, false); toast('👋 Hoş geldin! Önce avatarını oluştur.'); }
   api.subscribe({
     onProfile: onProfileChange, onTask: onTaskChange, onActivity: (row) => addFeed(row, true),
     onPresence: (set) => { S.online = set; refreshOnline(); },
@@ -96,7 +98,7 @@ function onProfileChange({ type, row, old }) {
   }
   renderTeam(); renderTasks(); renderAssigneeSelect();
   if (row?.id === S.me) { buildStatusPicker(); renderMe(); }
-  if (S.selected && (row?.id === S.selected || old?.id === S.selected)) selectPerson(S.selected, false);
+  if (S.selected && S.selected !== S.me && (row?.id === S.selected || old?.id === S.selected)) selectPerson(S.selected, false);
 }
 
 function onTaskChange({ type, row, old }) {
@@ -112,7 +114,7 @@ function onTaskChange({ type, row, old }) {
   const affected = new Set([t?.assignee, prev?.assignee].filter(Boolean));
   affected.forEach((id) => office.setTaskCount(id, openCount(id)));
   renderTeam(); renderTasks();
-  if (S.selected) selectPerson(S.selected, false);
+  if (S.selected && S.selected !== S.me) selectPerson(S.selected, false);
 }
 
 function refreshOnline() {
@@ -125,12 +127,30 @@ function buildStatusPicker() {
   const me = meP(); const box = $('#statusPicker'); box.innerHTML = '';
   Object.entries(STATUSES).forEach(([k, s]) => {
     const b = document.createElement('button');
-    b.innerHTML = `<span>${s.icon}</span>${s.label}`;
+    b.innerHTML = me.status === k ? `<span>${s.icon}</span>${s.label}` : `<span>${s.icon}</span>`; b.title = s.label;
     if (me.status === k) { b.classList.add('active'); b.style.background = s.color; }
     b.onclick = () => guard(() => api.updateProfile({ status: k, status_note: $('#statusNote').value.trim() }));
     box.appendChild(b);
   });
   if (document.activeElement !== $('#statusNote')) $('#statusNote').value = me.status_note || '';
+  const mb = $('#moodPicker'); mb.innerHTML = '';
+  Object.entries(MOODS).forEach(([k, m]) => {
+    const b = document.createElement('button'); b.textContent = m.icon; b.title = 'Duygu durumu: ' + m.label;
+    b.classList.toggle('active', (me.mood || 'normal') === k);
+    b.onclick = () => guard(() => api.updateProfile({ mood: k }));
+    mb.appendChild(b);
+  });
+}
+
+// ---------------------------------------------------------------- Katlar
+function renderFloors() {
+  const box = $('#floorTabs'); if (!box) return;
+  const floors = office.floorList;
+  box.hidden = floors.length < 2 || !S.started;
+  if (box.hidden) return;
+  const cnt = office.floorCounts();
+  box.innerHTML = floors.map((f) => `<button data-f="${esc(f.id)}" class="${office.active === f.id ? 'active' : ''}">${esc(f.name)} <span class="muted">${cnt[f.id] || 0}</span></button>`).join('');
+  $$('#floorTabs button').forEach((b) => b.onclick = () => { office.setFloor(b.dataset.f); office.fitView(); });
 }
 $('#statusNote').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 $('#statusNote').addEventListener('change', (e) => guard(() => api.updateProfile({ status_note: e.target.value.trim() })));
@@ -146,7 +166,7 @@ function renderTeam() {
     const s = STATUSES[p.status] ?? STATUSES.musait, n = openCount(p.id), on = S.online.has(p.id);
     return `<li data-id="${esc(p.id)}" class="${on ? '' : 'off'} ${S.selected === p.id ? 'sel' : ''}" title="${on ? 'Çevrimiçi' : 'Çevrimdışı'}">
       <span class="dot" style="background:${esc(p.color)};${on ? '' : 'opacity:.35'}"></span>
-      <span class="nm">${esc(p.display_name)}${p.id === S.me ? ' <span class="muted">(sen)</span>' : ''}</span>
+      <span class="mood" title="${esc(MOODS[p.mood || 'normal']?.label)}">${MOODS[p.mood || 'normal']?.icon ?? ''}</span><span class="nm">${esc(p.display_name)}${p.id === S.me ? ' <span class="muted">(sen)</span>' : ''}</span>
       ${n ? `<span class="cnt">${n} iş</span>` : ''}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></li>`;
   }).join('');
@@ -167,7 +187,7 @@ function selectPerson(id, focus = true) {
   S.selected = id;
   office.setHighlight(id);
   const card = $('#personCard');
-  if (!id || !S.profiles.has(id)) { card.hidden = true; S.selected = null; renderTeam(); return; }
+  if (!id || !S.profiles.has(id)) { card.hidden = true; S.selected = null; preview?.dispose(); preview = null; renderTeam(); return; }
   const p = S.profiles.get(id), s = STATUSES[p.status] ?? STATUSES.musait;
   if (focus) office.focus(id);
   const tasks = [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti');
@@ -176,22 +196,47 @@ function selectPerson(id, focus = true) {
   card.innerHTML = `<button class="x" title="Kapat">×</button>
     <h4><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.display_name)}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
-    <div class="muted small">${p.status_note ? esc(p.status_note) + ' · ' : ''}Masa ${p.desk_no ?? '—'} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
+    <div class="muted small">${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}Masa ${p.desk_no ?? '—'} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
     ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
-    ${self ? `<form class="task-form" id="profForm">
-        <div class="row"><input name="display_name" maxlength="40" value="${esc(p.display_name)}" required />
-        <input name="color" type="color" value="${esc(p.color)}" title="Avatar rengi" /></div>
-        <div class="row"><select name="desk_no">${Array.from({ length: DESK_COUNT }, (_, i) => i + 1).map((n) =>
-          `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>Masa ${n}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select>
-        <button class="primary" type="submit">Profili kaydet</button></div></form>` : ''}`;
+    ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
   card.querySelector('.x').onclick = () => selectPerson(null);
+  preview?.dispose(); preview = null;
   const pf = $('#profForm');
-  if (pf) pf.onsubmit = (e) => {
-    e.preventDefault(); const f = new FormData(pf);
-    guard(async () => { await api.updateProfile({ display_name: f.get('display_name').trim(), color: f.get('color'), desk_no: Number(f.get('desk_no')) }); toast('Profil kaydedildi'); });
-  };
+  if (pf) {
+    preview = new AvatarPreview($('#avPrev'));
+    const draft = () => {
+      const f = new FormData(pf);
+      return { ...p, display_name: f.get('display_name').trim() || p.display_name, color: f.get('color'), desk_no: Number(f.get('desk_no')),
+        avatar: { skin: f.get('skin'), hair: f.get('hair'), hairColor: f.get('hairColor'), extra: f.get('extra') } };
+    };
+    preview.show(draft());
+    pf.oninput = pf.onchange = () => preview.show(draft());
+    pf.onsubmit = (e) => {
+      e.preventDefault(); const d = draft();
+      guard(async () => { await api.updateProfile({ display_name: d.display_name, color: d.color, desk_no: d.desk_no, avatar: d.avatar }); toast('Profil kaydedildi'); });
+    };
+  }
   renderTeam();
+}
+
+function editorHtml(p, takenDesks) {
+  const av = { ...DEFAULT_AVATAR, ...(p.avatar || {}) };
+  const swatches = (name, list, cur) => `<div class="sw">${list.map((c) => `<label><input type="radio" name="${name}" value="${c}" ${c === cur ? 'checked' : ''}/><i style="background:${c}"></i></label>`).join('')}</div>`;
+  const opts = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('');
+  return `<form class="editor" id="profForm">
+    <canvas id="avPrev" width="220" height="260"></canvas>
+    <div class="ed-fields">
+      <input name="display_name" maxlength="40" value="${esc(p.display_name)}" required />
+      <div class="ed-row"><span>Ten</span>${swatches('skin', AVATAR_OPTS.skin, av.skin)}</div>
+      <div class="ed-row"><span>Saç</span><select name="hair">${opts(AVATAR_OPTS.hair, av.hair)}</select></div>
+      <div class="ed-row"><span>Saç rengi</span>${swatches('hairColor', AVATAR_OPTS.hairColor, av.hairColor)}</div>
+      <div class="ed-row"><span>Aksesuar</span><select name="extra">${opts(AVATAR_OPTS.extra, av.extra)}</select></div>
+      <div class="ed-row"><span>Kıyafet</span><input name="color" type="color" value="${esc(p.color)}" /></div>
+      <div class="ed-row"><span>Masa</span><select name="desk_no">${office.deskNumbers.map((n) =>
+        `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>Masa ${n}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select></div>
+      <button class="primary" type="submit">Kaydet</button>
+    </div></form>`;
 }
 
 // ---------------------------------------------------------------- Görevler
