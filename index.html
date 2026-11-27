@@ -26,6 +26,7 @@
     <input id="statusNote" class="note" maxlength="80" placeholder="Not (ör. Müşteri ziyareti)" />
     <div id="moodPicker" class="mood-picker" role="group" aria-label="Duygu durumum"></div>
     <div class="spacer"></div>
+    <button id="menuBtn" class="chat-btn" title="Diğer">☰</button>
     <button id="chatBtn" class="chat-btn" title="Sohbet">💬<span id="chatBadge" class="badge" hidden></span></button>
     <span id="conn" class="conn" title="Bağlantı durumu">●</span>
     <span id="clock" class="clock"></span>
@@ -48,7 +49,7 @@
       <button data-tab="planli">Planlı</button>
       <button data-tab="biten">Biten</button>
     </div>
-    <label class="mine"><input type="checkbox" id="onlyMine" /> Sadece benimkiler</label>
+    <div class="tfilters"><label class="mine"><input type="checkbox" id="onlyMine" /> Sadece benimkiler</label><select id="catFilter" hidden></select></div>
     <ul id="taskList" class="tasks"></ul>
     <form id="taskForm" class="task-form" autocomplete="off">
       <input name="title" maxlength="120" placeholder="Yeni görev…" required />
@@ -60,6 +61,7 @@
         <input name="due_date" type="date" />
         <select name="priority"><option value="1">Yüksek</option><option value="2" selected>Normal</option><option value="3">Düşük</option></select>
       </div>
+      <input name="category" list="catList" maxlength="40" placeholder="Kategori (isteğe bağlı, ör. Hat 3 retrofit)" />
       <button type="submit" class="primary">Ekle</button>
     </form>
   </aside>
@@ -84,12 +86,16 @@
   <div id="toasts" class="toasts"></div>
   <div id="notifs" class="notifs"></div>
   <div id="urgentOverlay" class="urgent-ov" hidden></div>
+  <div id="xMenu" class="xmenu" hidden></div>
+  <div id="modal" class="modal" hidden><div class="m-box"><button class="m-x" title="Kapat">×</button><div class="m-body"></div></div></div>
+  <datalist id="catList"></datalist>
   <div id="offlineBanner" class="banner" hidden>Bağlantı koptu — yeniden bağlanılıyor… Görünen durum son bilinen durumdur.</div>
 
   <!-- Mobil panel düğmeleri -->
   <div class="mobile-tabs" id="mobileTabs" hidden>
     <button data-panel="teamPanel">👥 Ekip</button>
     <button data-panel="taskPanel">✅ Görevler</button>
+    <button id="menuBtnM">☰</button>
     <button id="chatBtnM">💬<span id="chatBadgeM" class="badge" hidden></span></button>
     <button id="fitBtn" title="Görünümü sıfırla">🎯</button>
   </div>

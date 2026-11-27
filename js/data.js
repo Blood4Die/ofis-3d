@@ -2,6 +2,7 @@
 // SupabaseBackend (gerçek) ve DemoBackend (yerel, sekmeler arası) aynı metotları sunar.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
+export const EXT_TABLES = ['task_comments', 'task_followers', 'task_attachments', 'room_bookings', 'leaves', 'task_templates'];
 const todayStr = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD yerel saat
 
 // ---------------------------------------------------------------- Supabase
@@ -90,6 +91,54 @@ export class SupabaseBackend {
     if (error) throw new Error(error.message);
   }
 
+  // ---- Genel tablo erişimi (yeni modüller bunu kullanır)
+  _q(table, q = {}) {
+    let x = this.sb.from(table).select('*');
+    Object.entries(q.eq || {}).forEach(([k, v]) => { x = x.eq(k, v); });
+    Object.entries(q.gte || {}).forEach(([k, v]) => { x = x.gte(k, v); });
+    if (q.order) x = x.order(q.order[0], { ascending: q.order[1] !== false });
+    if (q.limit) x = x.limit(q.limit);
+    return x;
+  }
+  async list(table, q) { const { data, error } = await this._q(table, q); if (error) throw new Error(error.message); return data; }
+  async insert(table, row) { const { data, error } = await this.sb.from(table).insert(row).select().single(); if (error) throw this._err(error); return data; }
+  async update(table, match, patch) {
+    let x = this.sb.from(table).update(patch);
+    Object.entries(typeof match === 'object' ? match : { id: match }).forEach(([k, v]) => { x = x.eq(k, v); });
+    const { error } = await x; if (error) throw this._err(error);
+  }
+  async remove(table, match) {
+    let x = this.sb.from(table).delete();
+    Object.entries(typeof match === 'object' ? match : { id: match }).forEach(([k, v]) => { x = x.eq(k, v); });
+    const { error } = await x; if (error) throw this._err(error);
+  }
+  async rpc(fn, args = {}) { const { data, error } = await this.sb.rpc(fn, args); if (error) throw this._err(error); return data; }
+  _err(e) {
+    if (e.code === '23P01') return new Error('Bu saat aralığında oda zaten dolu');
+    if (e.code === '23505') return new Error('Bu kayıt zaten var');
+    if (e.code === '42501') return new Error('Bu işlem için yetkin yok');
+    return new Error(e.message);
+  }
+  async upload(path, file) {
+    const { error } = await this.sb.storage.from('task-files').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (error) throw new Error(error.message);
+  }
+  async fileUrl(path, name) {
+    const { data, error } = await this.sb.storage.from('task-files').createSignedUrl(path, 600, { download: name || true });
+    if (error) throw new Error(error.message); return data.signedUrl;
+  }
+  async removeFile(path) { await this.sb.storage.from('task-files').remove([path]); }
+  async adminCall(action, payload = {}) {
+    const { data: { session } } = await this.sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/admin`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + session?.access_token },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Hata (${res.status})`);
+    return body;
+  }
+
   async savePush(sub) {
     const j = sub.toJSON();
     const row = { user_id: this.user.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_agent: navigator.userAgent.slice(0, 290) };
@@ -106,7 +155,9 @@ export class SupabaseBackend {
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fwd(h.onProfile))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fwd(h.onTask))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, (p) => h.onActivity(p.new))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) => h.onMessage?.(p.new))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) => h.onMessage?.(p.new));
+    for (const t of EXT_TABLES) ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, (p) => h.onTable?.(t, { type: p.eventType, row: p.new, old: p.old }));
+    ch
       .on('presence', { event: 'sync' }, () => h.onPresence(new Set(Object.keys(ch.presenceState()))))
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -177,6 +228,7 @@ export class DemoBackend {
     if (msg.t === 'profile') this.h.onProfile(msg.c);
     else if (msg.t === 'task') this.h.onTask(msg.c);
     else if (msg.t === 'activity') this.h.onActivity(msg.row);
+    else if (msg.t === 'table') this.h.onTable?.(msg.table, msg.c);
     else if (msg.t === 'message') { const m = msg.m, me = this.user?.id; if (!m.recipient || m.sender === me || m.recipient === me) this.h.onMessage?.(m); }
   }
   _log(db, actor, kind, message) {
@@ -201,7 +253,7 @@ export class DemoBackend {
       let desk = 1; while (used.has(desk) && desk < 22) desk++;
       const now = new Date().toISOString();
       p = { id: 'u' + (++db.seq), display_name: name.trim().slice(0, 40), color: '#4f8cff', desk_no: desk,
-        status: 'musait', status_note: '', mood: 'normal', avatar: {}, is_admin: false, updated_at: now, created_at: now };
+        status: 'musait', status_note: '', mood: 'normal', avatar: {}, is_admin: !db.profiles.some((x) => !x.bot), active: true, updated_at: now, created_at: now };
       db.profiles.push(p);
       const row = this._log(db, p.id, 'join', p.display_name + ' ofise katıldı');
       this._save(db);
@@ -267,6 +319,70 @@ export class DemoBackend {
   async loadMessages() {
     const me = this.user.id;
     return (this._db().messages || []).filter((m) => !m.recipient || m.sender === me || m.recipient === me);
+  }
+  _t(db, table) { db.tables = db.tables || {}; return (db.tables[table] = db.tables[table] || []); }
+  async list(table, q = {}) {
+    const db = this._db(); let rows = [...this._t(db, table)];
+    Object.entries(q.eq || {}).forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); });
+    Object.entries(q.gte || {}).forEach(([k, v]) => { rows = rows.filter((r) => r[k] >= v); });
+    if (q.order) rows.sort((a, b) => String(a[q.order[0]]).localeCompare(String(b[q.order[0]])) * (q.order[1] === false ? -1 : 1));
+    return rows;
+  }
+  _match(r, m) { return Object.entries(typeof m === 'object' ? m : { id: m }).every(([k, v]) => r[k] === v); }
+  async insert(table, row) {
+    const db = this._db(), t = this._t(db, table);
+    const defaults = { task_comments: { author: this.user.id }, task_attachments: { uploaded_by: this.user.id }, task_templates: { created_by: this.user.id, active: true },
+      room_bookings: { booked_by: this.user.id, room: 'toplanti' }, leaves: { user_id: this.user.id, kind: 'yillik' } }[table] || {};
+    const r = { ...(table === 'task_followers' ? {} : { id: ++db.seq }), ...defaults, ...row, created_at: new Date().toISOString() };
+    if (table === 'room_bookings' && t.some((b) => b.room === r.room && b.starts_at < r.ends_at && r.starts_at < b.ends_at)) throw new Error('Bu saat aralığında oda zaten dolu');
+    if (table === 'task_followers' && t.some((f) => f.task_id === r.task_id && f.user_id === r.user_id)) throw new Error('Bu kayıt zaten var');
+    t.push(r); this._save(db);
+    this._emit({ t: 'table', table, c: { type: 'INSERT', row: r } });
+    return r;
+  }
+  async update(table, match, patch) {
+    const db = this._db();
+    this._t(db, table).filter((r) => this._match(r, match)).forEach((r) => { const old = { ...r }; Object.assign(r, patch); this._emit({ t: 'table', table, c: { type: 'UPDATE', row: r, old } }); });
+    this._save(db);
+  }
+  async remove(table, match) {
+    const db = this._db(), t = this._t(db, table), gone = t.filter((r) => this._match(r, match));
+    db.tables[table] = t.filter((r) => !this._match(r, match)); this._save(db);
+    gone.forEach((r) => this._emit({ t: 'table', table, c: { type: 'DELETE', row: {}, old: r } }));
+  }
+  async rpc(fn) {
+    if (fn !== 'run_recurring_today') return null;
+    const db = this._db(), today = todayStr(), dow = ((new Date().getDay() + 6) % 7) + 1, dom = new Date().getDate();
+    let n = 0;
+    for (const t of this._t(db, 'task_templates')) {
+      if (!t.active || (t.last_run && t.last_run >= today)) continue;
+      const due = t.rule === 'gunluk' || (t.rule === 'haftaici' && dow <= 5) || (t.rule === 'haftalik' && t.weekday === dow) || (t.rule === 'aylik' && t.monthday === dom);
+      if (!due) continue;
+      t.last_run = today; this._save(db);
+      await this.addTask({ title: t.title, notes: t.notes, priority: t.priority, assignee: t.assignee, due_date: today, category: t.category, template_id: t.id, kind: 'gunluk' });
+      n++;
+    }
+    return n;
+  }
+  async upload(path, file) {
+    if (file.size > 1.5e6) throw new Error('Demo modunda en fazla 1,5 MB');
+    const url = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+    try { localStorage.setItem('ofis3d-file-' + path, url); } catch { throw new Error('Demo depolama dolu'); }
+  }
+  async fileUrl(path) { return localStorage.getItem('ofis3d-file-' + path); }
+  async removeFile(path) { localStorage.removeItem('ofis3d-file-' + path); }
+  async adminCall(action, b = {}) {
+    const db = this._db(), p = db.profiles.find((x) => x.id === b.user_id);
+    switch (action) {
+      case 'list': return { users: db.profiles.map((x) => ({ ...x, email: x.id + '@demo.local', last_sign_in_at: x.updated_at, push: 0 })), settings: { invite_code: 'DEMO-KODU', max_users: '20', email_enabled: '0' } };
+      case 'reset_password': return { temp_password: 'DEMO-1234-56' };
+      case 'set_active': if (p) this._updProfile(p.id, { active: !!b.active }); return { ok: true };
+      case 'set_admin': if (p) this._updProfile(p.id, { is_admin: !!b.is_admin }); return { ok: true };
+      case 'set_desk': if (p) this._updProfile(p.id, { desk_no: b.desk_no ? Number(b.desk_no) : null }); return { ok: true };
+      case 'set_name': if (p) this._updProfile(p.id, { display_name: b.display_name }); return { ok: true };
+      case 'rotate_invite': return { invite_code: 'YENI-DEMO' };
+      default: return { ok: true };
+    }
   }
   async savePush() {}
   async removePush() {}

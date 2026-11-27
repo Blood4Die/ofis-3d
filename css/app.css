@@ -256,3 +256,107 @@ button.link { border: none; background: none; padding: 0; color: var(--accent); 
 .u-body { font-size: 18px; margin: 14px 0 18px; word-break: break-word; }
 .u-actions { display: flex; gap: 10px; justify-content: center; }
 .u-actions button { padding: 10px 22px; font-size: 15px; }
+
+/* ---------- Menü ve modal ---------- */
+.xmenu { position: fixed; top: 64px; right: 140px; z-index: 30; background: #fff; border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: grid; min-width: 220px; }
+.xmenu button { border: none; background: none; text-align: left; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+.xmenu button:hover { background: #f1f4f8; }
+.modal { position: fixed; inset: 0; z-index: 25; background: rgba(20,28,45,.35); display: grid; place-items: center; backdrop-filter: blur(2px); }
+.m-box { position: relative; width: min(560px, 94vw); max-height: 88vh; overflow: auto; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.3); padding: 18px 20px; }
+.m-box.wide { width: min(820px, 96vw); }
+.m-x { position: sticky; float: right; top: 0; border: none; background: #fff; font-size: 22px; color: var(--muted); padding: 0 6px; z-index: 2; }
+.m-body h3 { margin: 0 0 10px; }
+.m-body h4 { margin: 14px 0 6px; font-size: 13.5px; }
+.m-body .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.m-body form { display: grid; gap: 6px; }
+.m-body textarea { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; resize: vertical; width: 100%; }
+.m-body .del { border: none; background: none; color: #b2bac6; font-size: 13px; margin-left: auto; }
+.m-body .del:hover { color: var(--bad); }
+button.danger { color: var(--bad); border-color: #ffc9c9; margin-left: auto; }
+.small { font-size: 12px; }
+
+/* Görev detayı */
+.td-head { display: flex; align-items: center; gap: 10px; margin-right: 30px; }
+.td-head .st { width: 30px; height: 30px; border-radius: 8px; border: 2px solid #c3ccd8; background: #fff; flex: none; }
+.td-head .st.suruyor { border-color: var(--warn); background: #fff3dd; } .td-head .st.bitti { border-color: var(--ok); background: var(--ok); color: #fff; }
+.td-title { flex: 1; font-size: 18px; font-weight: 700; border-color: transparent; }
+.td-title:hover { border-color: var(--line); }
+.td-head h3 { margin: 0; }
+.td-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 8px; }
+.td-grid label, .td-notes { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.td-grid select, .td-grid input { color: var(--ink); }
+.td-sec { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
+.td-check, .td-files, .td-comments, .tpl-list, .lv-list, .rb-list ul { list-style: none; margin: 0; padding: 0; }
+.td-check li { display: flex; align-items: center; padding: 4px 0; }
+.td-check label { display: flex; gap: 8px; align-items: center; flex: 1; cursor: pointer; }
+.td-check .done { text-decoration: line-through; color: var(--muted); }
+.prog { height: 6px; background: #eef1f5; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+.prog i { display: block; height: 100%; background: var(--ok); }
+.td-add { display: flex; gap: 6px; margin-top: 6px; }
+.td-add input, .td-add textarea { flex: 1; }
+.td-files li { display: flex; gap: 8px; align-items: center; padding: 5px 0; flex-wrap: wrap; }
+.td-files a { color: var(--accent); font-weight: 600; text-decoration: none; word-break: break-all; }
+.upload { display: inline-block; margin-top: 6px; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 600; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip2 { background: #eef2f8; border-radius: 999px; padding: 3px 4px 3px 10px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 2px; }
+.chip2 button { border: none; background: none; color: var(--muted); padding: 0 5px; }
+.td-comments li { background: #f6f8fb; border-radius: 10px; padding: 8px 10px; margin: 6px 0; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: center; }
+.td-comments li > div { grid-column: 1 / -1; white-space: pre-wrap; word-break: break-word; }
+.td-comments time { font-size: 11px; color: var(--muted); }
+.td-foot { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tasks .meta .cat { color: var(--accent); font-weight: 600; }
+.tasks .tt { cursor: pointer; } .tasks .tt:hover { color: var(--accent); }
+.tfilters { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-bottom: 6px; }
+.tfilters select { font-size: 12.5px; padding: 4px 6px; max-width: 160px; }
+.tfilters .mine { margin: 0; }
+
+/* Şablonlar */
+.tpl-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tpl-list li > div { flex: 1; display: grid; }
+.tpl-list li.off { opacity: .55; }
+.sw-tg { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.tpl-form { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+/* Toplantı odası */
+.room-sign { background: #fff; border-radius: 10px; padding: 5px 10px; font-size: 12px; box-shadow: 0 3px 12px rgba(0,0,0,.18); border-left: 4px solid var(--ok); cursor: pointer; pointer-events: auto; line-height: 1.35; white-space: nowrap; }
+.room-sign span { color: var(--muted); font-size: 11px; }
+.room-sign.busy { border-left-color: var(--bad); }
+.room-now { padding: 10px 12px; border-radius: 10px; background: #e9f8f0; margin-bottom: 10px; }
+.room-now.busy { background: #ffecec; }
+.rb-list li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.rb-list li.now { background: #fff6e5; }
+
+/* İzin takvimi */
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-h { font-size: 11px; color: var(--muted); text-align: center; padding: 2px; }
+.cal-c { min-height: 62px; background: #f6f8fb; border-radius: 6px; padding: 3px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.cal-c.empty { background: none; } .cal-c.we { background: #eef0f4; } .cal-c.today { outline: 2px solid var(--accent); }
+.cal-c .dn { font-size: 11px; color: var(--muted); }
+.cal-c .lv { color: #fff; font-size: 10.5px; border-radius: 4px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lv-form { margin-top: 12px; }
+.lv-list li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+
+/* Yönetici */
+.adm-set { display: grid; gap: 8px; background: #f6f8fb; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.adm-set > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-set > div > .muted:first-child { width: 130px; }
+.adm-set code { background: #fff; border: 1px solid var(--line); padding: 4px 8px; border-radius: 6px; font-weight: 700; letter-spacing: 1px; }
+.adm-set input[type=number] { width: 80px; }
+.adm-wrap { overflow-x: auto; }
+table.adm { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.adm th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 6px; border-bottom: 1px solid var(--line); }
+table.adm td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.adm tr.off td { opacity: .5; }
+table.adm .adm-name { width: 150px; }
+table.adm select { max-width: 170px; font-size: 12.5px; }
+.temp-pw { background: #fff6e0; border: 1px solid #f6c76a; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.temp-pw code { font-size: 15px; font-weight: 700; background: #fff; padding: 2px 8px; border-radius: 6px; }
+
+@media (max-width: 900px) {
+  .xmenu { top: auto; bottom: calc(66px + env(safe-area-inset-bottom)); right: 8px; left: 8px; }
+  .m-box, .m-box.wide { width: 100vw; max-height: 92vh; border-radius: 16px 16px 0 0; align-self: end; padding: 14px; }
+  .modal { place-items: end center; }
+  .td-grid, .m-body .row3 { grid-template-columns: 1fr 1fr; }
+  .cal-c { min-height: 46px; }
+}
