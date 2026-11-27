@@ -5,6 +5,7 @@ Tarayıcıda çalışan, 3D animasyonlu ofis içinde ekibin durumunu ve günlük
 ## Mimari
 | Parça | Görev |
 |---|---|
+| `public/js/layout.js` | **Ofis düzeni (katlar, alanlar, mobilya)** — genişletme buradan |
 | `public/` | Uygulamanın tamamı: düz HTML + JS (ES modülleri), derleme adımı yok |
 | `public/vendor/` | three.js r187 ve supabase-js 2.x (yerel kopya, CDN bağımlılığı yok; MIT) |
 | Supabase (`ofis-3d`, eu-central-1) | Postgres, kimlik doğrulama, Realtime (postgres_changes + presence) |
@@ -31,5 +32,14 @@ Tarayıcıda çalışan, 3D animasyonlu ofis içinde ekibin durumunu ve günlük
 ## Demo
 `?demo=1` — sunucusuz; veri tarayıcının localStorage'ında, sekmeler arası BroadcastChannel ile senkron, sahte ekip üyeleri rastgele hareket eder.
 
-## Gerçek ofis modeline geçiş
-`office.js` içindeki `DESKS`, `MEETING_SEATS`, `KITCHEN_SPOTS`, `WALLS`, `OBSTACLES` ve `buildRoom()` değiştirilir; GLB model `GLTFLoader` ile yüklenip `buildRoom()` yerine konur. Avatar, yol bulma ve veri katmanı aynı kalır.
+## Ofisi genişletmek (kat, oda, yemekhane…)
+Düzen tamamen `public/js/layout.js` içinde veridir; çizim/yol bulma kodu değişmez.
+1. **Yeni kat:** `FLOORS` listesine kat nesnesi ekle (dosyadaki `UST` örneği: 1. Kat + yemekhane). Her iki katta `stairs: {x,z}` tanımla; avatarlar merdivene yürür, kat değiştirir, devam eder. 2+ kat olunca üstte kat seçici çıkar.
+2. **Yeni alan/durum:** Alana `zones: [{ kind:'yemek', spots:[...] }]` ya da masaya `zone:'yemek'` ver; `config.js` → `STATUSES`'a `place:'yemek'` olan durumu ekle; veritabanında `profiles_status_check` listesine yeni durum anahtarını ekle.
+3. **Yeni masa:** `bench` prop'u ekle (`deskStart` ile numara aralığı); `app_settings.desk_count` değerini güncelle.
+4. **Kullanıcı sınırı:** `app_settings.max_users`.
+
+Prop tipleri: bench, lockers, column, roundTable, longTable, counter, bistro, sofa, plant, screen, rack, workbench, machine, press, stairsProp. Yeni tip için `office.js` → `PROPS` nesnesine çizici ekle.
+
+## Avatar ve duygu durumu
+Kullanıcı ilk girişte avatarını oluşturur (ten, saç, saç rengi, aksesuar: gözlük/kulaklık/şapka/baret, kıyafet rengi). Duygu durumu (😄🔥🙂😐😴😣) avatarın yüz ifadesini ve hareketini değiştirir; `profiles.avatar` (jsonb) ve `profiles.mood`.

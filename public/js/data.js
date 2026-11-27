@@ -124,10 +124,16 @@ export class DemoBackend {
     let db = JSON.parse(localStorage.getItem(DEMO_KEY) || 'null');
     if (!db) {
       const now = new Date().toISOString();
-      const st = ['musait', 'toplantida', 'odakta', 'molada', 'musait', 'disarida', 'toplantida'];
+      const st = ['musait', 'toplantida', 'odakta', 'molada', 'sahada', 'disarida', 'toplantida'];
+      const moods = ['mutlu', 'iyi', 'motive', 'yorgun', 'normal', 'iyi', 'stresli'];
+      const looks = [
+        { skin: '#f6d5b8', hair: 'uzun', hairColor: '#5a3b26', extra: 'yok' }, { skin: '#eabf98', hair: 'kisa', hairColor: '#2b211c', extra: 'gozluk' },
+        { skin: '#c98e64', hair: 'topuz', hairColor: '#2b211c', extra: 'yok' }, { skin: '#eabf98', hair: 'kivircik', hairColor: '#a8743f', extra: 'kulaklik' },
+        { skin: '#f6d5b8', hair: 'uzun', hairColor: '#d8b46a', extra: 'gozluk' }, { skin: '#8d5a3b', hair: 'kel', hairColor: '#2b211c', extra: 'baret' },
+        { skin: '#eabf98', hair: 'kisa', hairColor: '#b3392f', extra: 'sapka' }];
       db = { seq: 100, profiles: [], tasks: [], activity: [] };
       DEMO_PEOPLE.forEach(([n, c], i) => db.profiles.push({
-        id: 'bot' + i, display_name: n, color: c, desk_no: i + 2, status: st[i], status_note: '',
+        id: 'bot' + i, display_name: n, color: c, desk_no: i + 2, status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
         is_admin: false, updated_at: now, created_at: now, bot: true,
       }));
       const titles = ['Teklif dosyasını hazırla', 'Haftalık rapor', 'Müşteri toplantısı notları', 'PLC yedeklerini al',
@@ -173,7 +179,7 @@ export class DemoBackend {
       let desk = 1; while (used.has(desk) && desk < 12) desk++;
       const now = new Date().toISOString();
       p = { id: 'u' + (++db.seq), display_name: name.trim().slice(0, 40), color: '#4f8cff', desk_no: desk,
-        status: 'musait', status_note: '', is_admin: false, updated_at: now, created_at: now };
+        status: 'musait', status_note: '', mood: 'normal', avatar: {}, is_admin: false, updated_at: now, created_at: now };
       db.profiles.push(p);
       const row = this._log(db, p.id, 'join', p.display_name + ' ofise katıldı');
       this._save(db);
@@ -199,7 +205,7 @@ export class DemoBackend {
     Object.assign(p, patch, { updated_at: new Date().toISOString() });
     let row = null;
     if (patch.status && patch.status !== old.status) {
-      const lbl = { musait: 'müsait', odakta: 'odakta', toplantida: 'toplantıda', molada: 'molada', disarida: 'dışarıda', izinli: 'izinli' }[p.status];
+      const lbl = { musait: 'müsait', odakta: 'odakta', toplantida: 'toplantıda', molada: 'molada', sahada: 'sahada (Üretim Tek. ve Bakım)', disarida: 'dışarıda', izinli: 'izinli' }[p.status];
       row = this._log(db, id, 'status', `${p.display_name} artık ${lbl}${p.status_note ? ' (' + p.status_note + ')' : ''}`);
     }
     this._save(db);
@@ -277,10 +283,14 @@ export class DemoBackend {
     const db = this._db();
     const bots = db.profiles.filter((p) => p.bot);
     const b = bots[Math.floor(Math.random() * bots.length)];
-    if (Math.random() < 0.6) {
-      const opts = ['musait', 'musait', 'odakta', 'toplantida', 'molada', 'disarida'].filter((s) => s !== b.status);
+    const r = Math.random();
+    if (r < 0.15) {
+      const ms = ['mutlu', 'iyi', 'normal', 'yorgun', 'stresli', 'motive'];
+      this._updProfile(b.id, { mood: ms[Math.floor(Math.random() * ms.length)] });
+    } else if (r < 0.65) {
+      const opts = ['musait', 'musait', 'odakta', 'toplantida', 'molada', 'sahada', 'disarida'].filter((s) => s !== b.status);
       const s = opts[Math.floor(Math.random() * opts.length)];
-      const notes = { toplantida: 'Haftalık değerlendirme', disarida: 'Saha ziyareti', molada: '', odakta: '', musait: '' };
+      const notes = { toplantida: 'Haftalık değerlendirme', disarida: 'Müşteri ziyareti', sahada: 'Bakım kontrolü' };
       this._updProfile(b.id, { status: s, status_note: notes[s] || '' });
     } else {
       const mine = db.tasks.filter((t) => t.assignee === b.id && t.state !== 'bitti');
