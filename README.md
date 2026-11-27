@@ -44,5 +44,12 @@ Prop tipleri: bench, lockers, column, roundTable, longTable, counter, bistro, so
 ## Sohbet
 Genel (herkes) ve kişiden kişiye özel mesaj. Tablo `messages` (`recipient` null = genel). RLS: genel mesajı herkes, özel mesajı yalnız gönderen ve alıcı okur. Genel mesaj gönderenin avatarı üstünde balon olarak görünür; özel mesajda gönderenin üstünde 💬 çıkar, alıcıya bildirim düşer. Okunmamış sayısı tarayıcıda (localStorage) tutulur. Son 14 günün mesajları yüklenir.
 
+## Arka plan bildirimleri (Web Push) ve acil mesaj
+- `public/sw.js` servis çalışanı + `manifest.webmanifest` (uygulama ana ekrana/masaüstüne kurulabilir).
+- Kullanıcı "Bildirimleri aç" deyince tarayıcı aboneliği `push_subscriptions` tablosuna yazılır.
+- `messages` ve `tasks` (atama) tablolarındaki trigger → `pg_net` → Edge Function `push` → web-push (VAPID). Sırlar `app_settings`'te (istemciye kapalı).
+- 🚨 Acil mesaj: alıcıda tam ekran kırmızı uyarı + tekrarlayan alarm; sistem bildirimi tıklanana kadar ekranda kalır (`requireInteraction`).
+- iPhone: yalnız "Ana Ekrana Ekle" ile kurulmuş uygulamada (iOS 16.4+) çalışır.
+
 ## Avatar ve duygu durumu
 Kullanıcı ilk girişte avatarını oluşturur (ten, saç, saç rengi, aksesuar: gözlük/kulaklık/şapka/baret, kıyafet rengi). Duygu durumu (😄🔥🙂😐😴😣) avatarın yüz ifadesini ve hareketini değiştirir; `profiles.avatar` (jsonb) ve `profiles.mood`.

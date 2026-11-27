@@ -235,3 +235,24 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
 @keyframes ring { 0%,100% { transform: rotate(0); } 10%,30% { transform: rotate(-14deg); } 20%,40% { transform: rotate(14deg); } 50% { transform: rotate(0); } }
 .small-btn { font-size: 12px !important; padding: 3px 6px !important; color: var(--accent); }
 @media (max-width: 900px) { .notifs { top: auto; bottom: calc(70px + env(safe-area-inset-bottom)); } }
+
+/* ---------- Push / acil ---------- */
+.push-bar { font-size: 12.5px; padding: 8px 12px; background: #f4f7fd; border-top: 1px solid var(--line); color: var(--ink); }
+button.link { border: none; background: none; padding: 0; color: var(--accent); font-weight: 600; text-decoration: underline; }
+.notif.prompt { animation: nin .3s ease-out; border-color: #c9d6f3; }
+.notif.prompt .primary { padding: 6px 12px; }
+.urgent-tg { display: flex; align-items: center; cursor: pointer; }
+.urgent-tg input { display: none; }
+.urgent-tg span { font-size: 18px; padding: 4px 6px; border-radius: 8px; filter: grayscale(1); opacity: .55; border: 1px solid var(--line); }
+.urgent-tg input:checked + span { filter: none; opacity: 1; background: #ffe3e3; border-color: #ff5c5c; animation: blink 1s infinite; }
+.chat-thread li.urgent { background: #ffe3e3; border: 1px solid #ff9b9b; }
+.chat-thread li.mine.urgent { background: #e0394a; }
+.urgent-ov { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(200, 20, 30, 0.55); animation: uflash 1s steps(2) infinite; backdrop-filter: blur(3px); }
+@keyframes uflash { 50% { background: rgba(200, 20, 30, 0.3); } }
+.u-box { width: min(420px, 92vw); background: #fff; border-radius: 18px; padding: 22px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.4); animation: nin .3s; }
+.u-icon { font-size: 48px; animation: ring 1s infinite; }
+.u-title { font-weight: 800; color: #d4202f; letter-spacing: 2px; margin: 4px 0 10px; }
+.u-from { display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600; }
+.u-body { font-size: 18px; margin: 14px 0 18px; word-break: break-word; }
+.u-actions { display: flex; gap: 10px; justify-content: center; }
+.u-actions button { padding: 10px 22px; font-size: 15px; }
