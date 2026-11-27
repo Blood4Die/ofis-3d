@@ -27,7 +27,7 @@ export function initPano(ctx) {
       api.list('checkins', { gte: { day: ymd(addDays(new Date(), -14)) } }),
     ].map((p) => p.catch((e) => { console.warn(e); return []; })));
     P.projects = pr; P.actions = ac; P.checkins = ck;
-    const u = new URL(location.href); if (u.searchParams.has('pano')) show('pano');
+    const u = new URL(location.href); /* Pano artık Asakai'de: ?pano= derin bağlantısı kapalı */
     render();
   }
   const upsert = (arr, row, eq) => { const i = arr.findIndex((r) => eq(r)); if (i >= 0) arr[i] = row; else arr.push(row); };

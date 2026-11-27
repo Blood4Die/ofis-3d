@@ -553,3 +553,7 @@ button.big { width: 100%; margin-top: 8px; padding: 11px; font-size: 15px; }
   .floor-tabs { top: auto; }
 }
 .kpi b span { font-size: inherit; color: inherit; display: inline; }
+
+.view-sw .view-link { display: inline-flex; align-items: center; gap: 2px; border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.view-sw .view-link:hover { color: #e8321e; }
+a.msg-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: inherit; }

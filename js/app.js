@@ -213,13 +213,12 @@ function selectPerson(id, focus = true) {
     <h4><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.display_name)}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
     <div class="muted small">${esc(p.dept || ROLES[p.role] || '')}${p.dept || p.role ? ' · ' : ''}${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
-    <div class="card-acts">${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}<button class="msg-btn" id="panelBtn">📋 ${self ? 'Kişisel panelim' : 'Kişi paneli'}</button></div>
+    <div class="card-acts">${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}<a class="msg-btn" href="https://mvnbzdnvz6-source.github.io/Proje-Asakai/" target="_blank" rel="noopener">📊 Asakai</a></div>
     ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
     ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
   card.querySelector('.x').onclick = () => selectPerson(null);
   const mb = $('#msgBtn'); if (mb) mb.onclick = () => { selectPerson(null); openChat(id); };
-  $('#panelBtn').onclick = () => { selectPerson(null); pano.show('me', id); };
   preview?.dispose(); preview = null;
   const pf = $('#profForm');
   if (pf) {
@@ -585,6 +584,7 @@ pano = initPano({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, todaySt
 function renderTaskFormProjects() {
   const sel = $('#taskForm [name=project_id]'); if (!sel) return;
   const cur = sel.value;
+  sel.hidden = !pano.projects.length; // projeler Asakai'de; burada kayıt yoksa alanı gizle
   sel.innerHTML = '<option value="">Proje (isteğe bağlı)</option>' + pano.projects.filter((p) => p.status !== 'tamamlandi').map((p) => `<option value="${p.id}" ${String(p.id) === cur ? 'selected' : ''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('');
 }
 
