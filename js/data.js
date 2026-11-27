@@ -78,6 +78,18 @@ export class SupabaseBackend {
     if (error) throw new Error(error.message);
   }
 
+  async loadMessages() {
+    const since = new Date(Date.now() - 14 * 864e5).toISOString();
+    const { data, error } = await this.sb.from('messages').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(400);
+    if (error) throw new Error(error.message);
+    return data.reverse();
+  }
+
+  async sendMessage(recipient, body) {
+    const { error } = await this.sb.from('messages').insert({ recipient: recipient || null, body });
+    if (error) throw new Error(error.message);
+  }
+
   // h: {onProfile, onTask, onActivity, onPresence, onConnection}
   subscribe(h) {
     let everSubscribed = false;
@@ -86,6 +98,7 @@ export class SupabaseBackend {
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fwd(h.onProfile))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fwd(h.onTask))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, (p) => h.onActivity(p.new))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) => h.onMessage?.(p.new))
       .on('presence', { event: 'sync' }, () => h.onPresence(new Set(Object.keys(ch.presenceState()))))
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -156,6 +169,7 @@ export class DemoBackend {
     if (msg.t === 'profile') this.h.onProfile(msg.c);
     else if (msg.t === 'task') this.h.onTask(msg.c);
     else if (msg.t === 'activity') this.h.onActivity(msg.row);
+    else if (msg.t === 'message') { const m = msg.m, me = this.user?.id; if (!m.recipient || m.sender === me || m.recipient === me) this.h.onMessage?.(m); }
   }
   _log(db, actor, kind, message) {
     const row = { id: ++db.seq, actor, kind, message, created_at: new Date().toISOString() };
@@ -242,6 +256,19 @@ export class DemoBackend {
     rows.forEach((row) => this._emit({ t: 'activity', row }));
   }
 
+  async loadMessages() {
+    const me = this.user.id;
+    return (this._db().messages || []).filter((m) => !m.recipient || m.sender === me || m.recipient === me);
+  }
+  async sendMessage(recipient, body, sender = this.user.id) {
+    const db = this._db();
+    db.messages = db.messages || [];
+    const m = { id: ++db.seq, sender, recipient: recipient || null, body, created_at: new Date().toISOString() };
+    db.messages.push(m); db.messages = db.messages.slice(-300);
+    this._save(db);
+    this._emit({ t: 'message', m });
+  }
+
   async deleteTask(id) {
     const db = this._db();
     db.tasks = db.tasks.filter((x) => x.id !== id);
@@ -284,7 +311,10 @@ export class DemoBackend {
     const bots = db.profiles.filter((p) => p.bot);
     const b = bots[Math.floor(Math.random() * bots.length)];
     const r = Math.random();
-    if (r < 0.15) {
+    if (r < 0.12) {
+      const lines = ['Kahve isteyen var mı? ☕', 'Toplantı 10 dk sonra başlıyor', 'Raporu paylaştım 👍', 'Öğle yemeğine kim geliyor?', 'Bakım ekibi hatta, sorun çözüldü'];
+      this.sendMessage(null, lines[Math.floor(Math.random() * lines.length)], b.id);
+    } else if (r < 0.22) {
       const ms = ['mutlu', 'iyi', 'normal', 'yorgun', 'stresli', 'motive'];
       this._updProfile(b.id, { mood: ms[Math.floor(Math.random() * ms.length)] });
     } else if (r < 0.65) {
