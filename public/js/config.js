@@ -47,3 +47,11 @@ export const levelOf = (p) => (!p ? 0 : p.is_admin ? 3 : p.role === 'mudur' ? 2 
 export const PHASES = ['Fizibilite', 'Tasarım', 'Kalıp / Prototip', 'İmalat', 'Deneme & Onay', 'Seri devri'];
 export const PDCA = ['P', 'D', 'C', 'A'];
 export const PDCA_T = ['Planla: sorunu ve kök nedeni tanımla', 'Uygula: karşı önlemi hayata geçir', 'Kontrol et: sonucu ölç', 'Önlem al: standartlaştır ve kapat'];
+
+// Proje Asakai (ayrı Supabase projesi). Günlük maddeler, izinler, takipler orada tutulur;
+// Ofis 3D aynı tabloya (records) Asakai'nin biçimiyle okur/yazar. Anahtar Asakai sitesinde de herkese açıktır.
+export const ASAKAI_URL = 'https://ahdgpidujumnfkcrxuwd.supabase.co';
+export const ASAKAI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoZGdwaWR1anVtbmZrY3J4dXdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3NzY5NjMsImV4cCI6MjExMTM1Mjk2M30.T7uXH5vqq5M9QJkhiwp6SPTnseK2sfeBgmGcza-pYr8';
+export const ASAKAI_ADMIN = 'r.yazici@polatas.com.tr';
+export const ASAKAI_SITE = 'https://mvnbzdnvz6-source.github.io/Proje-Asakai/';
+export const ASAKAI_LEAVE_TYPES = ['Yıllık izin', 'Raporlu', 'Mazeret izni', 'Eğitim', 'Dış görev'];

@@ -3,6 +3,7 @@ import { SupabaseBackend, DemoBackend, todayStr } from './data.js';
 import { Office, AvatarPreview } from './office.js';
 import { initExt } from './ext.js';
 import { initPano } from './pano.js';
+import { initAsakai } from './asakai.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -30,8 +31,8 @@ function toast(msg) {
 async function guard(fn) {
   try { await fn(); } catch (e) { console.error(e); toast('⚠️ ' + (e.message || 'İşlem başarısız')); }
 }
-const openCount = (id) => [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti').length;
-let ext = null, pano = null; // aşağıda, yardımcılar tanımlandıktan sonra başlatılır
+const openCount = (id) => ak?.connected ? ak.planCount(id) : [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti').length;
+let ext = null, pano = null, ak = null; // aşağıda, yardımcılar tanımlandıktan sonra başlatılır
 
 // ---------------------------------------------------------------- Giriş
 $$('.auth-tabs button').forEach((b) => b.onclick = () => {
@@ -85,6 +86,7 @@ async function start() {
   initPush().catch(console.warn);
   await ext.load().catch(console.warn);
   await pano.load().catch(console.warn);
+  await ak.start();
   renderTaskFormProjects();
   handleDeepLink(new URL(location.href));
 }
@@ -100,7 +102,7 @@ async function reloadAll(animate) {
   $('#feed').innerHTML = ''; data.activity.forEach((r) => addFeed(r, false));
   try { S.msgs = await api.loadMessages(); } catch (e) { console.error(e); }
   renderChat();
-  renderTeam(); renderTasks(); renderAssigneeSelect();
+  renderTeam(); renderTasks(); renderAssigneeSelect(); ak?.refreshAvatars();
 }
 
 // ---------------------------------------------------------------- Canlı olaylar
@@ -111,7 +113,7 @@ function onProfileChange({ type, row, old }) {
     S.profiles.set(row.id, row);
     office.upsertPerson(row, { animate: true, online: S.online.has(row.id), openTasks: openCount(row.id), isMe: row.id === S.me });
   }
-  renderTeam(); renderTasks(); renderAssigneeSelect(); ext.updateRoomSign(); pano?.render();
+  renderTeam(); renderTasks(); renderAssigneeSelect(); ext.updateRoomSign(); pano?.render(); ak?.refreshAvatars();
   if (row?.id === S.me) { buildStatusPicker(); renderMe(); }
   if (S.selected && S.selected !== S.me && (row?.id === S.selected || old?.id === S.selected)) selectPerson(S.selected, false);
 }
@@ -206,7 +208,6 @@ function selectPerson(id, focus = true) {
   const p = S.profiles.get(id), s = STATUSES[p.status] ?? STATUSES.musait;
   if (focus) office.focus(id);
   if (window.innerWidth <= 900) $$('.panel').forEach((x) => x.classList.remove('open'));
-  const tasks = [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti');
   const self = id === S.me;
   const takenDesks = new Set([...S.profiles.values()].filter((x) => x.id !== id).map((x) => x.desk_no));
   card.innerHTML = `<button class="x" title="Kapat">×</button>
@@ -214,7 +215,7 @@ function selectPerson(id, focus = true) {
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
     <div class="muted small">${esc(p.dept || ROLES[p.role] || '')}${p.dept || p.role ? ' · ' : ''}${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
     <div class="card-acts">${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}<a class="msg-btn" href="https://mvnbzdnvz6-source.github.io/Proje-Asakai/" target="_blank" rel="noopener">📊 Asakai</a></div>
-    ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
+    ${ak.cardHtml(id)}
     ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
   card.querySelector('.x').onclick = () => selectPerson(null);
@@ -579,8 +580,10 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--tb', $('#
 
 // ---------------------------------------------------------------- Genişletilmiş özellikler
 ext = initExt({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, hhmm, fmtDate, todayStr, canEdit, canDelete, renderTasks: () => { renderTasks(); pano?.render(); }, renderTeam,
-  projectOf: (id) => pano?.project(id), projects: () => pano?.projects || [] } });
+  projectOf: (id) => pano?.project(id), projects: () => pano?.projects || [], ak: () => ak } });
 pano = initPano({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, todayStr, renderTasks: () => { renderTasks(); renderTaskFormProjects(); }, openTask: (id) => ext.openTask(id), leaveToday: (id) => ext.leaveToday(id) } });
+ak = initAsakai({ S, api, office, h: { $, $$, esc, toast, myEmail: () => api.user?.email || '',
+  onChange: () => { renderTeam(); if (S.selected && S.selected !== S.me) selectPerson(S.selected, false); } } });
 function renderTaskFormProjects() {
   const sel = $('#taskForm [name=project_id]'); if (!sel) return;
   const cur = sel.value;

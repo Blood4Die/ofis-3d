@@ -75,7 +75,7 @@ export function initExt(ctx) {
   }
   const categories = () => [...new Set([...S.tasks.values()].map((t) => t.category).concat(X.templates.map((t) => t.category)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
   const isFollower = (taskId, uid = S.me) => X.followers.some((f) => f.task_id === taskId && f.user_id === uid);
-  const leaveToday = (uid) => { const d = todayStr(); return X.leaves.find((l) => l.user_id === uid && l.start_date <= d && l.end_date >= d); };
+  const leaveToday = (uid) => { const ak = ctx.h.ak?.(); if (ak?.connected) return ak.leaveToday(uid); const d = todayStr(); return X.leaves.find((l) => l.user_id === uid && l.start_date <= d && l.end_date >= d); };
 
   // ------------------------------------------------------------ Görev detayı
   function openTask(id) { if (!S.tasks.has(id)) { toast('Görev bulunamadı'); return; } X.openTask = id; openModal('task', true); renderTask(); }
@@ -267,6 +267,8 @@ export function initExt(ctx) {
   // ------------------------------------------------------------ İzin takvimi
   function openLeaves() { openModal('leaves', true); renderLeaves(); }
   function renderLeaves() {
+    const ak = ctx.h.ak?.();
+    if (ak?.connected) return ak.renderLeaves(mbody, renderLeaves, X.leaveMonth, (d) => { X.leaveMonth = new Date(X.leaveMonth.getFullYear(), X.leaveMonth.getMonth() + d, 1); renderLeaves(); });
     const m = X.leaveMonth, y = m.getFullYear(), mo = m.getMonth();
     const first = new Date(y, mo, 1), startDow = (first.getDay() + 6) % 7, daysIn = new Date(y, mo + 1, 0).getDate();
     const today = todayStr();
@@ -365,7 +367,7 @@ export function initExt(ctx) {
   // ------------------------------------------------------------ Menü
   const menu = $('#xMenu');
   function renderMenu() {
-    menu.innerHTML = `<button data-x="rooms">📅 Toplantı odası</button><button data-x="leaves">🏖️ İzin takvimi</button><button data-x="templates">🔁 Tekrarlayan görevler</button>${isAdmin() ? '<button data-x="admin">🛡️ Yönetici paneli</button>' : ''}`;
+    menu.innerHTML = `<button data-x="rooms">📅 Toplantı odası</button><button data-x="leaves">🏖️ İzin takvimi</button>${ctx.h.ak?.()?.connected ? '' : '<button data-x="templates">🔁 Tekrarlayan görevler</button>'}${isAdmin() ? '<button data-x="admin">🛡️ Yönetici paneli</button>' : ''}`;
     $$('[data-x]', menu).forEach((b) => b.onclick = () => { menu.hidden = true; ({ rooms: openRooms, leaves: openLeaves, templates: openTemplates, admin: openAdmin })[b.dataset.x](); });
   }
   const toggleMenu = (e) => { e.stopPropagation(); renderMenu(); menu.hidden = !menu.hidden; };

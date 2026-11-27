@@ -471,7 +471,7 @@ export class Office {
     if (!a) {
       a = makeAvatar(p); this.avatars.set(p.id, a);
       const el = a.el = document.createElement('div'); el.className = 'avatar-label';
-      el.innerHTML = '<span class="al-mood"></span><span class="al-name"></span><span class="al-icon"></span><span class="al-badge" hidden></span>';
+      el.innerHTML = '<span class="al-mood"></span><span class="al-name"></span><span class="al-icon"></span><span class="al-flag"></span><span class="al-badge" hidden></span>';
       a.label = new CSS2DObject(el); a.label.position.set(0, 2.05, 0); a.label.center.set(0.5, 1); a.group.add(a.label);
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
       el.addEventListener('click', (e) => { e.stopPropagation(); this.onAvatarClick?.(p.id); });
@@ -543,6 +543,7 @@ export class Office {
     a.online = online; a.el.classList.toggle('offline', !online);
     if (a.visible && !a.target?.hide) a.opacityGoal = online ? 1 : 0.35;
   }
+  setFlag(id, txt) { const a = this.avatars.get(id); if (!a) return; const f = a.el.querySelector('.al-flag'); if (f && f.textContent !== txt) f.textContent = txt || ''; }
   setTaskCount(id, n) { const a = this.avatars.get(id); if (!a) return; const b = a.el.querySelector('.al-badge'); b.hidden = !n; b.textContent = n; }
   // Toplantı odası tabelası (rezervasyon durumu)
   setRoomSign(html, busy) {
