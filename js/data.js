@@ -85,10 +85,18 @@ export class SupabaseBackend {
     return data.reverse();
   }
 
-  async sendMessage(recipient, body) {
-    const { error } = await this.sb.from('messages').insert({ recipient: recipient || null, body });
+  async sendMessage(recipient, body, urgent = false) {
+    const { error } = await this.sb.from('messages').insert({ recipient: recipient || null, body, urgent: !!urgent });
     if (error) throw new Error(error.message);
   }
+
+  async savePush(sub) {
+    const j = sub.toJSON();
+    const row = { user_id: this.user.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_agent: navigator.userAgent.slice(0, 290) };
+    const { error } = await this.sb.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' });
+    if (error) throw new Error(error.message);
+  }
+  async removePush(endpoint) { await this.sb.from('push_subscriptions').delete().eq('endpoint', endpoint); }
 
   // h: {onProfile, onTask, onActivity, onPresence, onConnection}
   subscribe(h) {
@@ -260,10 +268,12 @@ export class DemoBackend {
     const me = this.user.id;
     return (this._db().messages || []).filter((m) => !m.recipient || m.sender === me || m.recipient === me);
   }
-  async sendMessage(recipient, body, sender = this.user.id) {
+  async savePush() {}
+  async removePush() {}
+  async sendMessage(recipient, body, urgent = false, sender = this.user.id) {
     const db = this._db();
     db.messages = db.messages || [];
-    const m = { id: ++db.seq, sender, recipient: recipient || null, body, created_at: new Date().toISOString() };
+    const m = { id: ++db.seq, sender, recipient: recipient || null, body, urgent: !!urgent, created_at: new Date().toISOString() };
     db.messages.push(m); db.messages = db.messages.slice(-300);
     this._save(db);
     this._emit({ t: 'message', m });
@@ -313,7 +323,7 @@ export class DemoBackend {
     const r = Math.random();
     if (r < 0.12) {
       const lines = ['Kahve isteyen var mı? ☕', 'Toplantı 10 dk sonra başlıyor', 'Raporu paylaştım 👍', 'Öğle yemeğine kim geliyor?', 'Bakım ekibi hatta, sorun çözüldü'];
-      this.sendMessage(null, lines[Math.floor(Math.random() * lines.length)], b.id);
+      this.sendMessage(null, lines[Math.floor(Math.random() * lines.length)], false, b.id);
     } else if (r < 0.22) {
       const ms = ['mutlu', 'iyi', 'normal', 'yorgun', 'stresli', 'motive'];
       this._updProfile(b.id, { mood: ms[Math.floor(Math.random() * ms.length)] });

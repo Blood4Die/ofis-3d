@@ -1,6 +1,7 @@
 // Supabase bağlantısı. Publishable anahtar tarayıcıda herkese açık olacak şekilde tasarlanmıştır;
 // veri güvenliği veritabanındaki RLS kurallarıyla sağlanır.
 export const SUPABASE_URL = 'https://hhwrrgxnvtqeugppkqdt.supabase.co';
+export const VAPID_PUBLIC = 'BD6myk07u3gIP7m_bMfNp2A2bgEzoAQuXt44iscl3PsB58sEPll07fElGmGJRtveAFrCBYR7JZz0hRpWfiXPDws';
 export const SUPABASE_KEY = 'sb_publishable_n0KwF3mBMPXz_0f_BlIE4A_4r28CKLy';
 
 export const STATUSES = {

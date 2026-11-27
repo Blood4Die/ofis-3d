@@ -1,4 +1,4 @@
-import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR } from './config.js';
+import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR, VAPID_PUBLIC } from './config.js';
 import { SupabaseBackend, DemoBackend, todayStr } from './data.js';
 import { Office, AvatarPreview } from './office.js';
 
@@ -78,6 +78,8 @@ async function start() {
     },
   });
   setInterval(tickClock, 15000); tickClock();
+  initPush().catch(console.warn);
+  handleDeepLink(new URL(location.href));
 }
 
 async function reloadAll(animate) {
@@ -277,8 +279,9 @@ $('#chatBack').onclick = () => { S.chatWith = null; renderChat(); };
 $('#chatForm').onsubmit = (e) => {
   e.preventDefault();
   const inp = e.target.body, body = inp.value.trim(); if (!body || !S.chatWith) return;
-  inp.value = '';
-  guard(() => api.sendMessage(S.chatWith === 'genel' ? null : S.chatWith, body));
+  const urgent = e.target.urgent.checked;
+  inp.value = ''; e.target.urgent.checked = false;
+  guard(() => api.sendMessage(S.chatWith === 'genel' ? null : S.chatWith, body, urgent));
 };
 
 function renderChat() {
@@ -311,8 +314,8 @@ function renderChat() {
   thread.innerHTML = msgs.length ? msgs.map((m) => {
     const mine = m.sender === S.me, d = new Date(m.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
     const sep = d !== prevDay ? `<li class="day">${d}</li>` : ''; prevDay = d;
-    return `${sep}<li class="${mine ? 'mine' : ''}">${!mine && key === 'genel' ? `<span class="who" style="color:${esc(S.profiles.get(m.sender)?.color || '#555')}">${esc(nameOf(m.sender))}</span>` : ''}
-      <span class="txt">${esc(m.body)}</span><time>${hhmm(m.created_at)}</time></li>`;
+    return `${sep}<li class="${mine ? 'mine' : ''} ${m.urgent ? 'urgent' : ''}">${!mine && key === 'genel' ? `<span class="who" style="color:${esc(S.profiles.get(m.sender)?.color || '#555')}">${esc(nameOf(m.sender))}</span>` : ''}
+      <span class="txt">${m.urgent ? '🚨 ' : ''}${esc(m.body)}</span><time>${hhmm(m.created_at)}</time></li>`;
   }).join('') : '<li class="empty">Henüz mesaj yok. İlk mesajı sen yaz 👋</li>';
   thread.scrollTop = thread.scrollHeight;
   markRead(key); updateBadges();
@@ -325,7 +328,8 @@ function onMessage(m) {
   if (!m.recipient) office.say(m.sender, m.body);
   else if (!mine) office.say(m.sender, '', { private: true, ms: 4000 });
   const viewing = S.chatOpen && S.chatWith === key && document.visibilityState === 'visible';
-  if (!mine && !viewing) notify(m, key);
+  if (!mine && m.urgent) showUrgent(m, key);
+  else if (!mine && !viewing) notify(m, key);
   renderChat();
 }
 
@@ -385,11 +389,91 @@ function notify(m, key) {
 }
 function renderNotifSettings() {
   const b = $('#muteBtn'); b.textContent = isMuted() ? '🔕' : '🔔'; b.title = isMuted() ? 'Sesi aç' : 'Sesi kapat';
-  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  $('#notifAsk').hidden = perm !== 'default';
+  pushState().then((st) => {
+    $('#notifAsk').hidden = true;
+    const bar = $('#pushBar');
+    const msg = {
+      on: '',
+      off: '🔔 Uygulama kapalıyken de bildirim almak için <button class="link" id="pushOn">bildirimleri aç</button>',
+      denied: '🔕 Bildirimler bu tarayıcıda engellenmiş. Adres çubuğundaki kilit simgesinden "Bildirimler: İzin ver" yapıp sayfayı yenile.',
+      ios: '📱 iPhone\'da bildirim için: Safari\'de <b>Paylaş → Ana Ekrana Ekle</b>, sonra uygulamayı ana ekrandan açıp bildirimleri aç.',
+      unsupported: 'Bu tarayıcı arka plan bildirimlerini desteklemiyor.',
+      demo: '',
+    }[st];
+    bar.innerHTML = msg; bar.hidden = !msg;
+    const b2 = $('#pushOn'); if (b2) b2.onclick = () => guard(enablePush);
+  });
 }
 $('#muteBtn').onclick = () => { localStorage.setItem(MUTE_KEY, isMuted() ? '0' : '1'); renderNotifSettings(); if (!isMuted()) chime(false); };
-$('#notifAsk').onclick = async () => { try { await Notification.requestPermission(); } catch {} renderNotifSettings(); };
+$('#notifAsk').onclick = () => guard(enablePush);
+
+// ---------------------------------------------------------------- Web Push (uygulama kapalıyken bildirim)
+let swReg = null;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; }).catch((e) => console.warn('SW', e));
+  navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'open') handleDeepLink(new URL(e.data.url)); });
+}
+function b64ToBytes(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4), raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function pushState() {
+  if (isDemo) return 'demo';
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return isIOS && !standalone ? 'ios' : 'unsupported';
+  if (Notification.permission === 'denied') return 'denied';
+  const reg = swReg || await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  return sub && Notification.permission === 'granted' ? 'on' : 'off';
+}
+async function enablePush() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { renderNotifSettings(); throw new Error('Bildirim izni verilmedi'); }
+  const reg = swReg || await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+  await api.savePush(sub);
+  toast('🔔 Bildirimler açık — uygulama kapalıyken de mesaj ve görev bildirimi alacaksın');
+  renderNotifSettings(); $('#pushPrompt')?.remove();
+}
+// Giriş sonrası: izin zaten verilmişse aboneliği sessizce tazele; verilmemişse bir kez hatırlat
+async function initPush() {
+  const st = await pushState();
+  if (st === 'on') { try { const reg = swReg || await navigator.serviceWorker.ready; await api.savePush(await reg.pushManager.getSubscription()); } catch (e) { console.warn(e); } }
+  else if (st === 'off' || st === 'ios') {
+    const el = document.createElement('div'); el.className = 'notif pub prompt'; el.id = 'pushPrompt';
+    el.innerHTML = `<span style="font-size:22px">🔔</span><div class="n-main"><b>Bildirimleri aç</b><span>${st === 'ios' ? 'Paylaş → Ana Ekrana Ekle, sonra uygulamadan aç' : 'Uygulama kapalıyken de acil mesaj ve görevleri gör'}</span></div>
+      ${st === 'off' ? '<button class="primary">Aç</button>' : ''}<button class="n-x" title="Kapat">×</button>`;
+    el.onclick = (e) => { if (e.target.classList.contains('primary')) guard(enablePush); if (e.target.classList.contains('n-x')) el.remove(); };
+    $('#notifs').prepend(el);
+  }
+}
+function handleDeepLink(url) {
+  const c = url.searchParams.get('chat');
+  if (c && S.started) openChat(c === 'genel' ? 'genel' : c);
+}
+
+// ---------------------------------------------------------------- Acil mesaj: tam ekran uyarı + tekrarlayan alarm
+let urgentTimer = null;
+function showUrgent(m, key) {
+  const ov = $('#urgentOverlay'), p = S.profiles.get(m.sender);
+  ov.innerHTML = `<div class="u-box"><div class="u-icon">🚨</div><div class="u-title">ACİL MESAJ</div>
+    <div class="u-from"><span class="dot" style="background:${esc(p?.color || '#888')}"></span>${esc(nameOf(m.sender))}${m.recipient ? '' : ' · Genel'}</div>
+    <div class="u-body">${esc(m.body)}</div>
+    <div class="u-actions"><button class="ghost u-ok">Gördüm</button><button class="primary u-reply">Yanıtla</button></div></div>`;
+  ov.hidden = false;
+  const stop = () => { ov.hidden = true; clearInterval(urgentTimer); urgentTimer = null; };
+  ov.querySelector('.u-ok').onclick = () => { stop(); markRead(key); updateBadges(); };
+  ov.querySelector('.u-reply').onclick = () => { stop(); openChat(key); };
+  clearInterval(urgentTimer);
+  const ring = () => { const was = isMuted(); if (!was) { chime(true); setTimeout(() => chime(true), 450); } };
+  ring(); urgentTimer = setInterval(ring, 2500);
+  flashTitle();
+  if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+    try { const n = new Notification('🚨 ACİL · ' + nameOf(m.sender), { body: m.body, requireInteraction: true, tag: 'urgent-' + m.id }); n.onclick = () => { window.focus(); n.close(); }; } catch {}
+  }
+}
 
 // ---------------------------------------------------------------- Görevler
 $$('#taskPanel .tabs button').forEach((b) => b.onclick = () => {
