@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ofis 3D · Canlı İş Takibi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script src="vendor/supabase.js"></script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <!-- Üst çubuk -->
+  <header id="topbar" hidden>
+    <div class="brand">🏢 <b>Ofis 3D</b> <span id="demoTag" class="tag" hidden>DEMO</span></div>
+    <div id="statusPicker" class="status-picker" role="group" aria-label="Durumum"></div>
+    <input id="statusNote" class="note" maxlength="80" placeholder="Not (ör. Müşteri ziyareti)" />
+    <div class="spacer"></div>
+    <span id="conn" class="conn" title="Bağlantı durumu">●</span>
+    <span id="clock" class="clock"></span>
+    <button id="meBtn" class="ghost" title="Profilim"></button>
+    <button id="logoutBtn" class="ghost" title="Çıkış">Çıkış</button>
+  </header>
+
+  <!-- Sol: ekip -->
+  <aside id="teamPanel" class="panel left" hidden>
+    <h3>Ekip <span id="onlineCount" class="muted"></span></h3>
+    <ul id="teamList" class="team"></ul>
+    <h3 class="feed-h">Canlı akış</h3>
+    <ul id="feed" class="feed"></ul>
+  </aside>
+
+  <!-- Sağ: görevler -->
+  <aside id="taskPanel" class="panel right" hidden>
+    <div class="tabs" role="tablist">
+      <button data-tab="bugun" class="active">Bugün</button>
+      <button data-tab="planli">Planlı</button>
+      <button data-tab="biten">Biten</button>
+    </div>
+    <label class="mine"><input type="checkbox" id="onlyMine" /> Sadece benimkiler</label>
+    <ul id="taskList" class="tasks"></ul>
+    <form id="taskForm" class="task-form" autocomplete="off">
+      <input name="title" maxlength="120" placeholder="Yeni görev…" required />
+      <div class="row">
+        <select name="kind"><option value="gunluk">Günlük</option><option value="planli">Planlı</option></select>
+        <select name="assignee"></select>
+      </div>
+      <div class="row">
+        <input name="due_date" type="date" />
+        <select name="priority"><option value="1">Yüksek</option><option value="2" selected>Normal</option><option value="3">Düşük</option></select>
+      </div>
+      <button type="submit" class="primary">Ekle</button>
+    </form>
+  </aside>
+
+  <!-- Kişi kartı -->
+  <div id="personCard" class="card" hidden></div>
+  <div id="toasts" class="toasts"></div>
+  <div id="offlineBanner" class="banner" hidden>Bağlantı koptu — yeniden bağlanılıyor… Görünen durum son bilinen durumdur.</div>
+
+  <!-- Mobil panel düğmeleri -->
+  <div class="mobile-tabs" id="mobileTabs" hidden>
+    <button data-panel="teamPanel">👥 Ekip</button>
+    <button data-panel="taskPanel">✅ Görevler</button>
+  </div>
+
+  <!-- Giriş -->
+  <div id="auth" class="auth">
+    <div class="auth-box">
+      <h1>🏢 Ofis 3D</h1>
+      <p class="muted">Canlı ofis ve iş takibi</p>
+      <div class="tabs auth-tabs">
+        <button data-auth="login" class="active">Giriş</button>
+        <button data-auth="signup">Kayıt ol</button>
+      </div>
+      <form id="loginForm">
+        <input name="email" type="email" placeholder="E-posta" required autocomplete="username" />
+        <input name="password" type="password" placeholder="Şifre" required autocomplete="current-password" />
+        <button class="primary" type="submit">Giriş yap</button>
+      </form>
+      <form id="signupForm" hidden>
+        <input name="name" maxlength="40" placeholder="Ad Soyad" required />
+        <input name="email" type="email" placeholder="E-posta" required autocomplete="username" />
+        <input name="password" type="password" minlength="8" placeholder="Şifre (en az 8 karakter)" required autocomplete="new-password" />
+        <input name="code" placeholder="Ofis davet kodu" required />
+        <button class="primary" type="submit">Kayıt ol</button>
+      </form>
+      <p id="authErr" class="err" hidden></p>
+      <p class="small muted"><a href="?demo=1">Demo modunu dene</a> (sunucusuz, bu tarayıcıda)</p>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

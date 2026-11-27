@@ -1,0 +1,17 @@
+name: Supabase uyanık tut
+# Ücretsiz Supabase projeleri 7 gün hareketsiz kalınca duraklatılır (ör. uzun bayram tatili).
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Veritabanına basit sorgu
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://hhwrrgxnvtqeugppkqdt.supabase.co/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: sb_publishable_n0KwF3mBMPXz_0f_BlIE4A_4r28CKLy")
+          echo "HTTP $code"
+          test "$code" = "200"
