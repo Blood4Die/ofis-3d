@@ -360,3 +360,5 @@ table.adm select { max-width: 170px; font-size: 12.5px; }
   .td-grid, .m-body .row3 { grid-template-columns: 1fr 1fr; }
   .cal-c { min-height: 46px; }
 }
+.room-sign.used { border-left-color: var(--warn); }
+.room-sign:hover { transform: scale(1.04); }

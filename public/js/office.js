@@ -473,7 +473,8 @@ export class Office {
       const el = a.el = document.createElement('div'); el.className = 'avatar-label';
       el.innerHTML = '<span class="al-mood"></span><span class="al-name"></span><span class="al-icon"></span><span class="al-badge" hidden></span>';
       a.label = new CSS2DObject(el); a.label.position.set(0, 2.05, 0); a.label.center.set(0.5, 1); a.group.add(a.label);
-      el.addEventListener('pointerup', (e) => { e.stopPropagation(); this.onAvatarClick?.(p.id); });
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', (e) => { e.stopPropagation(); this.onAvatarClick?.(p.id); });
     }
     a.profile = p;
     const av = { ...DEFAULT_AVATAR, ...(p.avatar || {}) }, mood = p.mood || 'normal', key = JSON.stringify(av) + mood;
@@ -549,13 +550,16 @@ export class Office {
     if (!this.roomSign) {
       const fl = list[0].floor, xs = list.map((s) => s.spot.x), zs = list.map((s) => s.spot.z);
       const el = document.createElement('div'); el.className = 'room-sign';
-      el.addEventListener('pointerup', (e) => { e.stopPropagation(); this.onRoomClick?.(); });
+      // OrbitControls etiket katmanında pointer'ı yakaladığı için tıklama buraya ulaşmıyordu: pointerdown'u burada durdur
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', (e) => { e.stopPropagation(); this.onRoomClick?.(); });
       this.roomSign = new CSS2DObject(el); this.roomSign.center.set(0.5, 1);
       this.roomSign.position.set((Math.min(...xs) + Math.max(...xs)) / 2, 2.6, Math.min(...zs) - 0.6);
       this.floors.get(fl).group.add(this.roomSign); this.roomSign.userData.floor = fl;
     }
     this.roomSign.element.innerHTML = html;
-    this.roomSign.element.classList.toggle('busy', !!busy);
+    this.roomSign.element.classList.toggle('busy', busy === 'busy' || busy === true);
+    this.roomSign.element.classList.toggle('used', busy === 'used');
     this.roomSign.visible = this.roomSign.userData.floor === this.active;
   }
 
