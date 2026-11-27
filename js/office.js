@@ -331,7 +331,11 @@ export class Office {
     s.background = new THREE.Color('#eef1f5'); s.fog = new THREE.Fog('#eef1f5', 50, 90);
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
     const c = this.controls = new OrbitControls(this.camera, l.domElement);
-    c.enableDamping = true; c.dampingFactor = 0.08; c.maxPolarAngle = 1.25; c.minDistance = 6; c.maxDistance = 55; c.screenSpacePanning = false;
+    c.enableDamping = true; c.dampingFactor = 0.08; c.maxPolarAngle = 1.25; c.minDistance = 5; c.maxDistance = 60; c.screenSpacePanning = false;
+    // Dokunmatik: tek parmak kaydır, iki parmak yakınlaştır/döndür
+    c.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    c.zoomToCursor = true;
+    c.addEventListener('change', () => this._clampTarget());
     s.add(new THREE.HemisphereLight('#ffffff', '#c3ccd8', 1.7));
     const sun = new THREE.DirectionalLight('#ffffff', 2.0);
     sun.position.set(-12, 26, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
@@ -415,17 +419,31 @@ export class Office {
     const w = this.container.clientWidth, h = this.container.clientHeight;
     this.renderer.setSize(w, h); this.labels.setSize(w, h);
     this.camera.aspect = w / Math.max(h, 1); this.camera.updateProjectionMatrix();
-    if (!this._fitted) { this.fitView(); this._fitted = true; }
+    const portrait = h > w * 1.05;
+    if (!this._fitted || portrait !== this._portrait) { this.fitView(); this._fitted = true; this._portrait = portrait; }
   }
-  fitView(sidePx = window.innerWidth > 900 ? 700 : 0) {
+  // Tüm katı ekrana sığdırır. Dikey ekranda (telefon) kat 90° çevrilerek gösterilir.
+  fitView() {
     const f = this.floors.get(this.active).def;
     const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
+    const portrait = h > w * 1.05, desktop = window.innerWidth > 900;
+    const sidePx = desktop ? 700 : 0;
     const avail = Math.max(w - sidePx, w * 0.45);
+    const fw = portrait ? f.depth : f.width, fd = portrait ? f.width : f.depth;
     const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)), tanH = tanV * (w / h);
-    const dist = Math.min(Math.max((f.width / 2 + 3) * w / (avail * tanH), (f.depth / 2 + 3) / tanV, 14), 52);
-    this.controls.target.set(0, 0, 1.2);
-    this.camera.position.copy(this.controls.target).addScaledVector(new THREE.Vector3(-0.05, 0.82, 0.57).normalize(), dist);
+    const margin = desktop ? 3 : 1;
+    const dist = Math.min(Math.max((fw / 2 + margin) * w / (avail * tanH), (fd / 2 + margin + (desktop ? 0 : 2)) / tanV, 12) * (desktop ? 1 : 1.2), 70);
+    this.controls.target.set(portrait ? -2.2 : 0, 0, portrait ? 0 : 1.2);
+    const dir = portrait ? new THREE.Vector3(0.38, 0.92, 0.03) : new THREE.Vector3(-0.05, 0.82, 0.57);
+    this.camera.position.copy(this.controls.target).addScaledVector(dir.normalize(), dist);
     this.controls.update();
+  }
+
+  // Kaydırırken katın dışına taşmayı engelle
+  _clampTarget() {
+    const f = this.floors.get(this.active)?.def; if (!f) return;
+    const t = this.controls.target, cx = THREE.MathUtils.clamp(t.x, -f.width / 2, f.width / 2), cz = THREE.MathUtils.clamp(t.z, -f.depth / 2, f.depth / 2);
+    if (cx !== t.x || cz !== t.z) { const dx = cx - t.x, dz = cz - t.z; t.x = cx; t.z = cz; this.camera.position.x += dx; this.camera.position.z += dz; }
   }
 
   // Kişinin durumuna göre hedef (kat + nokta)
