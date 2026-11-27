@@ -108,7 +108,7 @@ function onProfileChange({ type, row, old }) {
     S.profiles.set(row.id, row);
     office.upsertPerson(row, { animate: true, online: S.online.has(row.id), openTasks: openCount(row.id), isMe: row.id === S.me });
   }
-  renderTeam(); renderTasks(); renderAssigneeSelect();
+  renderTeam(); renderTasks(); renderAssigneeSelect(); ext.updateRoomSign();
   if (row?.id === S.me) { buildStatusPicker(); renderMe(); }
   if (S.selected && S.selected !== S.me && (row?.id === S.selected || old?.id === S.selected)) selectPerson(S.selected, false);
 }

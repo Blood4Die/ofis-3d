@@ -221,8 +221,11 @@ export function initExt(ctx) {
   function updateRoomSign() {
     const cur = currentBooking(), nx = nextBooking();
     const sameDay = (iso) => new Date(iso).toDateString() === new Date().toDateString();
-    if (cur) office.setRoomSign(`🔴 <b>Dolu</b> · ${tm(cur.ends_at)}'a kadar<br><span>${esc(cur.title)} — ${esc(nameOf(cur.booked_by))}</span>`, true);
-    else office.setRoomSign(`🟢 <b>Boş</b>${nx && sameDay(nx.starts_at) ? ` · ${tm(nx.starts_at)}'da toplantı var` : ''}<br><span>Rezerve etmek için tıkla</span>`, false);
+    const inside = [...S.profiles.values()].filter((p) => p.status === 'toplantida').length;
+    const later = nx && sameDay(nx.starts_at) ? ` · ${tm(nx.starts_at)}'da rezervasyon var` : '';
+    if (cur) office.setRoomSign(`🔴 <b>Dolu</b> · ${tm(cur.ends_at)}'a kadar<br><span>${esc(cur.title)} — ${esc(nameOf(cur.booked_by))}</span>`, 'busy');
+    else if (inside) office.setRoomSign(`🟡 <b>Kullanımda</b> · ${inside} kişi (rezervasyonsuz)${later}<br><span>Rezervasyon için tıkla</span>`, 'used');
+    else office.setRoomSign(`🟢 <b>Boş</b>${later}<br><span>Rezerve etmek için tıkla</span>`, '');
   }
   setInterval(updateRoomSign, 30000);
   office.onRoomClick = () => openRooms();
@@ -358,5 +361,5 @@ export function initExt(ctx) {
   $('#menuBtn').onclick = toggleMenu; $('#menuBtnM').onclick = toggleMenu;
   document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !menu.contains(e.target) && !e.target.closest('#menuBtn,#menuBtnM')) menu.hidden = true; });
 
-  return { load, onTable, openTask, taskMeta, categories, leaveToday, refreshTask: () => X.view === 'task' && renderTask(), renderCatList, openRooms, openLeaves, openTemplates, openAdmin };
+  return { updateRoomSign, load, onTable, openTask, taskMeta, categories, leaveToday, refreshTask: () => X.view === 'task' && renderTask(), renderCatList, openRooms, openLeaves, openTemplates, openAdmin };
 }
