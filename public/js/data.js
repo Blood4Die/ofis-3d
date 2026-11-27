@@ -133,7 +133,7 @@ export class DemoBackend {
         { skin: '#eabf98', hair: 'kisa', hairColor: '#b3392f', extra: 'sapka' }];
       db = { seq: 100, profiles: [], tasks: [], activity: [] };
       DEMO_PEOPLE.forEach(([n, c], i) => db.profiles.push({
-        id: 'bot' + i, display_name: n, color: c, desk_no: [19, 2, 5, 11, 13, 20, 8][i], status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
+        id: 'bot' + i, display_name: n, color: c, desk_no: [19, 2, 8, 14, 10, 21, 16][i], status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
         is_admin: false, updated_at: now, created_at: now, bot: true,
       }));
       const titles = ['Teklif dosyasını hazırla', 'Haftalık rapor', 'Müşteri toplantısı notları', 'PLC yedeklerini al',
