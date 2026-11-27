@@ -1,6 +1,6 @@
 // Genişletilmiş özellikler: görev detayı (yorum, kontrol listesi, ek, takipçi), kategoriler,
 // tekrarlayan görevler, toplantı odası rezervasyonu, izin takvimi, yönetici paneli.
-import { TASK_STATES } from './config.js';
+import { TASK_STATES, ROLES } from './config.js';
 
 const KIND_LV = { yillik: 'Yıllık izin', mazeret: 'Mazeret', resmi: 'Resmi tatil / görev', diger: 'Diğer' };
 const RULES = { gunluk: 'Her gün', haftaici: 'Hafta içi her gün', haftalik: 'Her hafta', aylik: 'Her ay' };
@@ -70,7 +70,8 @@ export function initExt(ctx) {
   function taskMeta(t) {
     const cl = Array.isArray(t.checklist) ? t.checklist : [], done = cl.filter((x) => x.d).length;
     const nc = X.comments.get(t.id)?.length || 0, na = X.attachments.filter((a) => a.task_id === t.id).length;
-    return `${t.category ? `<span class="cat">#${esc(t.category)}</span>` : ''}${cl.length ? `<span>☑ ${done}/${cl.length}</span>` : ''}${nc ? `<span>💬 ${nc}</span>` : ''}${na ? `<span>📎 ${na}</span>` : ''}${t.template_id ? '<span title="Tekrarlayan görev">🔁</span>' : ''}`;
+    const pr = t.project_id ? ctx.h.projectOf?.(t.project_id) : null;
+    return `${pr ? `<span class="prc" style="--pc:${esc(pr.color)}">${esc(pr.code)}</span>` : ''}${t.state === 'engel' ? `<span class="bad">⛔ ${esc(t.block_reason || 'Engel')}</span>` : ''}${t.hours ? `<span>⏱ ${t.hours} sa</span>` : ''}${t.category ? `<span class="cat">#${esc(t.category)}</span>` : ''}${cl.length ? `<span>☑ ${done}/${cl.length}</span>` : ''}${nc ? `<span>💬 ${nc}</span>` : ''}${na ? `<span>📎 ${na}</span>` : ''}${t.template_id ? '<span title="Tekrarlayan görev">🔁</span>' : ''}`;
   }
   const categories = () => [...new Set([...S.tasks.values()].map((t) => t.category).concat(X.templates.map((t) => t.category)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
   const isFollower = (taskId, uid = S.me) => X.followers.some((f) => f.task_id === taskId && f.user_id === uid);
@@ -88,7 +89,7 @@ export function initExt(ctx) {
     const focused = document.activeElement?.closest?.('#modal') ? document.activeElement.name : null;
     mbody.innerHTML = `
       <div class="td-head">
-        <button class="st ${t.state}" id="tdState" ${ed ? '' : 'disabled'} title="${TASK_STATES[t.state].label}">${t.state === 'bitti' ? '✓' : t.state === 'suruyor' ? '▶' : ''}</button>
+        <button class="st ${t.state}" id="tdState" ${ed ? '' : 'disabled'} title="${TASK_STATES[t.state].label}">${t.state === 'bitti' ? '✓' : t.state === 'suruyor' ? '▶' : t.state === 'engel' ? '⛔' : ''}</button>
         ${ed ? `<input class="td-title" name="title" maxlength="120" value="${esc(t.title)}" />` : `<h3>${esc(t.title)}</h3>`}
       </div>
       <div class="td-grid">
@@ -96,9 +97,12 @@ export function initExt(ctx) {
         <label>Termin<input type="date" name="due_date" value="${t.due_date || ''}" ${ed ? '' : 'disabled'} /></label>
         <label>Öncelik<select name="priority" ${ed ? '' : 'disabled'}>${[1, 2, 3].map((n) => `<option value="${n}" ${n === t.priority ? 'selected' : ''}>${PRIO[n]}</option>`).join('')}</select></label>
         <label>Tür<select name="kind" ${ed ? '' : 'disabled'}><option value="gunluk" ${t.kind === 'gunluk' ? 'selected' : ''}>Günlük</option><option value="planli" ${t.kind === 'planli' ? 'selected' : ''}>Planlı</option></select></label>
+        <label>Proje<select name="project_id" ${ed ? '' : 'disabled'}><option value="">—</option>${(ctx.h.projects?.() || []).map((p) => `<option value="${p.id}" ${p.id === t.project_id ? 'selected' : ''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('')}</select></label>
+        <label>Saat (tahmini/harcanan)<input type="number" name="hours" min="0" max="99" step="0.5" value="${t.hours ?? ''}" ${ed ? '' : 'disabled'} /></label>
         <label>Kategori<input name="category" list="catList" maxlength="40" value="${esc(t.category || '')}" placeholder="ör. Hat 3 retrofit" ${ed ? '' : 'disabled'} /></label>
         <label>Durum<select name="state" ${ed ? '' : 'disabled'}>${Object.entries(TASK_STATES).map(([k, v]) => `<option value="${k}" ${k === t.state ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
       </div>
+      ${t.state === 'engel' ? `<label class="td-notes blk">⛔ Engel nedeni<input name="block_reason" maxlength="200" value="${esc(t.block_reason || '')}" ${ed ? '' : 'disabled'} placeholder="Ne bekleniyor?" /></label>` : ''}
       <label class="td-notes">Açıklama<textarea name="notes" maxlength="1000" rows="3" ${ed ? '' : 'disabled'} placeholder="Ayrıntılar…">${esc(t.notes || '')}</textarea></label>
 
       <section class="td-sec"><h4>Kontrol listesi ${cl.length ? `<span class="muted">${cl.filter((x) => x.d).length}/${cl.length}</span>` : ''}</h4>
@@ -132,10 +136,10 @@ export function initExt(ctx) {
 
     const upd = (patch) => guard(() => api.updateTask(t.id, patch));
     $('#tdState', mbody)?.addEventListener('click', () => upd({ state: TASK_STATES[t.state].next }));
-    $$('.td-grid select, .td-grid input, .td-title, .td-notes textarea', mbody).forEach((el) => el.addEventListener('change', () => {
+    $$('.td-grid select, .td-grid input, .td-title, .td-notes textarea, .td-notes input', mbody).forEach((el) => el.addEventListener('change', () => {
       const v = el.value.trim();
       if (el.name === 'title' && !v) { el.value = t.title; return; }
-      const val = el.name === 'priority' ? Number(v) : (v || null);
+      const val = ['priority', 'project_id', 'hours'].includes(el.name) ? (v === '' ? null : Number(v)) : (v || null);
       upd({ [el.name]: el.name === 'title' ? v : val });
     }));
     const setCl = (next) => upd({ checklist: next });
@@ -318,15 +322,19 @@ export function initExt(ctx) {
         <div><span class="muted small">E-posta bildirimleri</span><label class="sw-tg"><input type="checkbox" id="mailOn" ${settings.email_enabled === '1' ? 'checked' : ''}/> Açık</label><span class="muted small">Brevo anahtarı tanımlanana kadar e-posta gitmez.</span></div>
       </section>
       <div class="adm-wrap"><table class="adm">
-        <thead><tr><th>Kişi</th><th>E-posta</th><th>Son giriş</th><th>Masa</th><th>Bildirim</th><th>Yönetici</th><th>Aktif</th><th></th></tr></thead>
+        <thead><tr><th>Kişi</th><th>Görev / unvan</th><th>Rol</th><th>Kapasite</th><th>E-posta</th><th>Son giriş</th><th>Masa</th><th>Bildirim</th><th title="Sistem yöneticisi: kullanıcı ve ayar yönetimi">Sistem yön.</th><th>Aktif</th><th></th></tr></thead>
         <tbody>${users.map((u) => `<tr class="${u.active === false ? 'off' : ''}" data-u="${esc(u.id)}">
           <td><input class="adm-name" value="${esc(u.display_name)}" maxlength="40" /></td>
+          <td><input class="adm-dept" value="${esc(u.dept || '')}" maxlength="40" placeholder="ör. Proje Mühendisi" /></td>
+          <td><select class="adm-role">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${(u.role || 'calisan') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+          <td><input class="adm-cap" type="number" min="0" max="24" step="0.5" value="${u.capacity ?? 8}" title="Günlük saat" /></td>
           <td class="small">${esc(u.email || '')}</td><td class="small">${lastIn(u.last_sign_in_at)}</td>
           <td><select class="adm-desk"><option value="">—</option>${desks.map((n) => `<option value="${n}" ${n === u.desk_no ? 'selected' : ''} ${taken.has(n) && n !== u.desk_no ? 'disabled' : ''}>${esc(office.deskName(n))}${taken.has(n) && n !== u.desk_no ? ' (' + esc(taken.get(n)) + ')' : ''}</option>`).join('')}</select></td>
           <td class="small">${u.push ? '🔔 ' + u.push : '—'}</td>
           <td><input type="checkbox" class="adm-admin" ${u.is_admin ? 'checked' : ''} ${u.id === S.me ? 'disabled' : ''}/></td>
           <td><input type="checkbox" class="adm-active" ${u.active !== false ? 'checked' : ''} ${u.id === S.me ? 'disabled' : ''}/></td>
           <td><button class="adm-pw">Şifre sıfırla</button></td></tr>`).join('')}</tbody></table></div>
+      <p class="muted small"><b>Roller:</b> Çalışan kendi işlerini yönetir · Yönetici herkesin görev ve aksiyonunu düzenler, herkese görev atar · Müdür ayrıca projeleri açar/siler ve kapasiteleri belirler · Sistem yöneticisi kullanıcıları ve ayarları yönetir.</p>
       <p class="muted small">Pasife alınan kişi giriş yapamaz ve ofiste görünmez; görevleri ve mesajları silinmez. Tekrar aktif edilebilir.</p>`;
     const call = (action, payload, msg) => guard(async () => { const r = await api.adminCall(action, payload); if (msg) toast(msg); X.adminData = await api.adminCall('list'); renderAdmin(); return r; });
     const copy = (txt) => navigator.clipboard?.writeText(txt).then(() => toast('📋 Kopyalandı'), () => toast(txt));
@@ -338,6 +346,9 @@ export function initExt(ctx) {
     $$('tr[data-u]', mbody).forEach((tr) => {
       const id = tr.dataset.u, u = users.find((x) => x.id === id);
       tr.querySelector('.adm-name').onchange = (e) => call('set_name', { user_id: id, display_name: e.target.value }, 'Ad güncellendi');
+      tr.querySelector('.adm-dept').onchange = (e) => call('set_profile', { user_id: id, dept: e.target.value }, 'Unvan güncellendi');
+      tr.querySelector('.adm-role').onchange = (e) => call('set_profile', { user_id: id, role: e.target.value }, 'Rol: ' + ROLES[e.target.value]);
+      tr.querySelector('.adm-cap').onchange = (e) => call('set_profile', { user_id: id, capacity: e.target.value }, 'Kapasite güncellendi');
       tr.querySelector('.adm-desk').onchange = (e) => call('set_desk', { user_id: id, desk_no: e.target.value || null }, 'Masa güncellendi');
       tr.querySelector('.adm-admin').onchange = (e) => call('set_admin', { user_id: id, is_admin: e.target.checked }, 'Yetki güncellendi');
       tr.querySelector('.adm-active').onchange = (e) => {

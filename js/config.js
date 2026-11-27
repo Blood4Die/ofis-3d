@@ -35,5 +35,15 @@ export const DEFAULT_AVATAR = { skin: '#eabf98', hair: 'kisa', hairColor: '#2b21
 export const TASK_STATES = {
   bekliyor: { label: 'Bekliyor', next: 'suruyor' },
   suruyor:  { label: 'Sürüyor',  next: 'bitti' },
+  engel:    { label: 'Engel',    next: 'suruyor' },
   bitti:    { label: 'Bitti',    next: 'bekliyor' },
 };
+
+// Roller: seviye 0 çalışan, 1 yönetici, 2 müdür; sistem yöneticisi (is_admin) = 3
+export const ROLES = { calisan: 'Çalışan', yonetici: 'Yönetici', mudur: 'Müdür' };
+export const levelOf = (p) => (!p ? 0 : p.is_admin ? 3 : p.role === 'mudur' ? 2 : p.role === 'yonetici' ? 1 : 0);
+
+// Proje aşamaları ve PDCA
+export const PHASES = ['Fizibilite', 'Tasarım', 'Kalıp / Prototip', 'İmalat', 'Deneme & Onay', 'Seri devri'];
+export const PDCA = ['P', 'D', 'C', 'A'];
+export const PDCA_T = ['Planla: sorunu ve kök nedeni tanımla', 'Uygula: karşı önlemi hayata geçir', 'Kontrol et: sonucu ölç', 'Önlem al: standartlaştır ve kapat'];
