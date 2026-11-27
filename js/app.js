@@ -259,10 +259,12 @@ function updateBadges() {
   const keys = ['genel', ...S.profiles.keys()].filter((k) => k !== S.me);
   const total = keys.reduce((n, k) => n + unreadCount(k), 0);
   [['#chatBadge'], ['#chatBadgeM']].forEach(([sel]) => { const b = $(sel); b.hidden = !total; b.textContent = total > 99 ? '99+' : total; });
+  if (!total) { $('#chatBtn').classList.remove('ring'); $('#chatBtnM').classList.remove('ring'); }
 }
 function openChat(key) {
   S.chatOpen = true; S.chatWith = key ?? null;
-  $('#chatPanel').hidden = false;
+  $('#chatPanel').hidden = false; renderNotifSettings();
+  $$('#notifs .notif').forEach((n) => n.remove());
   if (window.innerWidth <= 900) $$('.panel').forEach((x) => x.classList.remove('open'));
   renderChat();
   if (S.chatWith) setTimeout(() => $('#chatForm [name=body]').focus(), 50);
@@ -323,12 +325,71 @@ function onMessage(m) {
   if (!m.recipient) office.say(m.sender, m.body);
   else if (!mine) office.say(m.sender, '', { private: true, ms: 4000 });
   const viewing = S.chatOpen && S.chatWith === key && document.visibilityState === 'visible';
-  if (!mine && !viewing && m.recipient === S.me) {
-    const t = toast(`💬 ${nameOf(m.sender)}: ${m.body.slice(0, 80)}`);
-    if (t) { t.style.pointerEvents = 'auto'; t.style.cursor = 'pointer'; t.onclick = () => openChat(key); }
-  }
+  if (!mine && !viewing) notify(m, key);
   renderChat();
 }
+
+// ---------------------------------------------------------------- Bildirimler (ses + yanıp sönen kart + sekme başlığı + sistem bildirimi)
+const MUTE_KEY = 'ofis3d-mute';
+let audioCtx = null, titleTimer = null;
+const baseTitle = document.title;
+const isMuted = () => localStorage.getItem(MUTE_KEY) === '1';
+// Tarayıcılar sesi ancak bir kullanıcı etkileşiminden sonra çalar: ilk tıklamada ses motorunu aç
+window.addEventListener('pointerdown', () => {
+  if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+  audioCtx?.resume?.();
+}, { passive: true });
+function chime(priv) {
+  if (isMuted() || !audioCtx) return;
+  const t0 = audioCtx.currentTime, notes = priv ? [880, 1175, 1568] : [660, 880];
+  notes.forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0 + i * 0.12); g.gain.exponentialRampToValueAtTime(0.25, t0 + i * 0.12 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.12 + 0.35);
+    o.connect(g).connect(audioCtx.destination); o.start(t0 + i * 0.12); o.stop(t0 + i * 0.12 + 0.4);
+  });
+  navigator.vibrate?.(priv ? [120, 60, 120] : 80);
+}
+function flashTitle() {
+  if (titleTimer) return;
+  let on = false;
+  titleTimer = setInterval(() => {
+    const n = Number($('#chatBadge').textContent) || 0;
+    if (!n || document.visibilityState === 'visible') { clearInterval(titleTimer); titleTimer = null; document.title = baseTitle; return; }
+    on = !on; document.title = on ? `(${n}) 💬 Yeni mesaj` : baseTitle;
+  }, 1000);
+}
+function notify(m, key) {
+  const priv = !!m.recipient, p = S.profiles.get(m.sender);
+  chime(priv);
+  // Yanıp sönen bildirim kartı: tıklayınca sohbet açılır ve kart kapanır
+  const box = $('#notifs'), el = document.createElement('div');
+  el.className = 'notif ' + (priv ? 'priv' : 'pub');
+  el.innerHTML = `<span class="dot" style="background:${esc(p?.color || '#888')}"></span>
+    <div class="n-main"><b>${esc(nameOf(m.sender))}${priv ? ' · özel mesaj' : ' · Genel'}</b><span>${esc(m.body.slice(0, 140))}</span></div>
+    <button class="n-x" title="Kapat">×</button>`;
+  el.onclick = (e) => { el.remove(); if (!e.target.classList.contains('n-x')) openChat(key); };
+  box.prepend(el);
+  while (box.children.length > 4) box.lastChild.remove();
+  if (!priv) setTimeout(() => el.remove(), 9000);          // genel mesaj kartı kendiliğinden kapanır, özel mesaj tıklanana kadar kalır
+  $('#chatBtn').classList.add('ring'); $('#chatBtnM').classList.add('ring');
+  flashTitle();
+  // Sekme arka plandaysa sistem bildirimi
+  if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(`${nameOf(m.sender)}${priv ? ' (özel)' : ' (Genel)'}`, { body: m.body.slice(0, 140), tag: 'ofis3d-' + key, renotify: true });
+      n.onclick = () => { window.focus(); openChat(key); n.close(); };
+    } catch {}
+  }
+}
+function renderNotifSettings() {
+  const b = $('#muteBtn'); b.textContent = isMuted() ? '🔕' : '🔔'; b.title = isMuted() ? 'Sesi aç' : 'Sesi kapat';
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  $('#notifAsk').hidden = perm !== 'default';
+}
+$('#muteBtn').onclick = () => { localStorage.setItem(MUTE_KEY, isMuted() ? '0' : '1'); renderNotifSettings(); if (!isMuted()) chime(false); };
+$('#notifAsk').onclick = async () => { try { await Notification.requestPermission(); } catch {} renderNotifSettings(); };
 
 // ---------------------------------------------------------------- Görevler
 $$('#taskPanel .tabs button').forEach((b) => b.onclick = () => {
