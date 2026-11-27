@@ -196,7 +196,7 @@ function selectPerson(id, focus = true) {
   card.innerHTML = `<button class="x" title="Kapat">×</button>
     <h4><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.display_name)}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
-    <div class="muted small">${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}Masa ${p.desk_no ?? '—'} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
+    <div class="muted small">${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
     ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
     ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
@@ -234,7 +234,7 @@ function editorHtml(p, takenDesks) {
       <div class="ed-row"><span>Aksesuar</span><select name="extra">${opts(AVATAR_OPTS.extra, av.extra)}</select></div>
       <div class="ed-row"><span>Kıyafet</span><input name="color" type="color" value="${esc(p.color)}" /></div>
       <div class="ed-row"><span>Masa</span><select name="desk_no">${office.deskNumbers.map((n) =>
-        `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>Masa ${n}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select></div>
+        `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>${esc(office.deskName(n))}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select></div>
       <button class="primary" type="submit">Kaydet</button>
     </div></form>`;
 }
