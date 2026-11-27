@@ -133,7 +133,7 @@ export class DemoBackend {
         { skin: '#eabf98', hair: 'kisa', hairColor: '#b3392f', extra: 'sapka' }];
       db = { seq: 100, profiles: [], tasks: [], activity: [] };
       DEMO_PEOPLE.forEach(([n, c], i) => db.profiles.push({
-        id: 'bot' + i, display_name: n, color: c, desk_no: [19, 2, 6, 10, 11, 21, 7][i], status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
+        id: 'bot' + i, display_name: n, color: c, desk_no: [101, 2, 11, 19, 20, 103, 13][i], status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
         is_admin: false, updated_at: now, created_at: now, bot: true,
       }));
       const titles = ['Teklif dosyasını hazırla', 'Haftalık rapor', 'Müşteri toplantısı notları', 'PLC yedeklerini al',
@@ -176,7 +176,7 @@ export class DemoBackend {
     let p = db.profiles.find((x) => x.display_name.toLowerCase() === name.trim().toLowerCase() && !x.bot);
     if (!p) {
       const used = new Set(db.profiles.map((x) => x.desk_no));
-      let desk = 1; while (used.has(desk) && desk < 12) desk++;
+      let desk = 1; while (used.has(desk) && desk < 24) desk++;
       const now = new Date().toISOString();
       p = { id: 'u' + (++db.seq), display_name: name.trim().slice(0, 40), color: '#4f8cff', desk_no: desk,
         status: 'musait', status_note: '', mood: 'normal', avatar: {}, is_admin: false, updated_at: now, created_at: now };
