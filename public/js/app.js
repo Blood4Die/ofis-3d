@@ -1,7 +1,8 @@
-import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR, VAPID_PUBLIC } from './config.js';
+import { STATUSES, TASK_STATES, MOODS, AVATAR_OPTS, DEFAULT_AVATAR, VAPID_PUBLIC, ROLES, levelOf } from './config.js';
 import { SupabaseBackend, DemoBackend, todayStr } from './data.js';
 import { Office, AvatarPreview } from './office.js';
 import { initExt } from './ext.js';
+import { initPano } from './pano.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -19,8 +20,8 @@ let preview = null;
 // ---------------------------------------------------------------- Yardımcılar
 const meP = () => S.profiles.get(S.me);
 const nameOf = (id) => S.profiles.get(id)?.display_name ?? S.names.get(id) ?? '—';
-const canEdit = (t) => { const m = meP(); return !!m && (t.assignee === S.me || t.created_by === S.me || m.is_admin); };
-const canDelete = (t) => { const m = meP(); return !!m && (t.created_by === S.me || m.is_admin); };
+const canEdit = (t) => { const m = meP(); return !!m && (t.assignee === S.me || t.created_by === S.me || levelOf(m) >= 1); };
+const canDelete = (t) => { const m = meP(); return !!m && (t.created_by === S.me || levelOf(m) >= 1); };
 function toast(msg) {
   const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
   $('#toasts').appendChild(el); setTimeout(() => el.remove(), 4200);
@@ -30,7 +31,7 @@ async function guard(fn) {
   try { await fn(); } catch (e) { console.error(e); toast('⚠️ ' + (e.message || 'İşlem başarısız')); }
 }
 const openCount = (id) => [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti').length;
-let ext = null; // initExt aşağıda, yardımcılar tanımlandıktan sonra
+let ext = null, pano = null; // aşağıda, yardımcılar tanımlandıktan sonra başlatılır
 
 // ---------------------------------------------------------------- Giriş
 $$('.auth-tabs button').forEach((b) => b.onclick = () => {
@@ -71,9 +72,9 @@ async function start() {
   if (!meP().avatar || !Object.keys(meP().avatar).length) { selectPerson(S.me, false); toast('👋 Hoş geldin! Önce avatarını oluştur.'); }
   api.subscribe({
     onProfile: onProfileChange, onTask: onTaskChange, onActivity: (row) => addFeed(row, true),
-    onPresence: (set) => { S.online = set; refreshOnline(); },
+    onPresence: (set) => { const same = set.size === S.online.size && [...set].every((x) => S.online.has(x)); S.online = set; if (!same) refreshOnline(); },
     onMessage: onMessage,
-    onTable: (t, c) => ext.onTable(t, c),
+    onTable: (t, c) => { ext.onTable(t, c); pano.onTable(t, c); },
     onConnection: (state, wasReconnect) => {
       $('#conn').classList.toggle('off', state !== 'online');
       $('#offlineBanner').hidden = state === 'online';
@@ -83,6 +84,8 @@ async function start() {
   setInterval(tickClock, 15000); tickClock();
   initPush().catch(console.warn);
   await ext.load().catch(console.warn);
+  await pano.load().catch(console.warn);
+  renderTaskFormProjects();
   handleDeepLink(new URL(location.href));
 }
 
@@ -108,7 +111,7 @@ function onProfileChange({ type, row, old }) {
     S.profiles.set(row.id, row);
     office.upsertPerson(row, { animate: true, online: S.online.has(row.id), openTasks: openCount(row.id), isMe: row.id === S.me });
   }
-  renderTeam(); renderTasks(); renderAssigneeSelect(); ext.updateRoomSign();
+  renderTeam(); renderTasks(); renderAssigneeSelect(); ext.updateRoomSign(); pano?.render();
   if (row?.id === S.me) { buildStatusPicker(); renderMe(); }
   if (S.selected && S.selected !== S.me && (row?.id === S.selected || old?.id === S.selected)) selectPerson(S.selected, false);
 }
@@ -125,13 +128,13 @@ function onTaskChange({ type, row, old }) {
   }
   const affected = new Set([t?.assignee, prev?.assignee].filter(Boolean));
   affected.forEach((id) => office.setTaskCount(id, openCount(id)));
-  renderTeam(); renderTasks(); ext.refreshTask();
+  renderTeam(); renderTasks(); ext.refreshTask(); pano.render();
   if (S.selected && S.selected !== S.me) selectPerson(S.selected, false);
 }
 
 function refreshOnline() {
   S.profiles.forEach((p) => office.setOnline(p.id, S.online.has(p.id)));
-  renderTeam();
+  renderTeam(); if (pano?.view === 'pano') pano.render();
 }
 
 // ---------------------------------------------------------------- Üst çubuk
@@ -209,13 +212,14 @@ function selectPerson(id, focus = true) {
   card.innerHTML = `<button class="x" title="Kapat">×</button>
     <h4><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.display_name)}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
-    <div class="muted small">${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
-    ${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}
+    <div class="muted small">${esc(p.dept || ROLES[p.role] || '')}${p.dept || p.role ? ' · ' : ''}${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
+    <div class="card-acts">${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}<button class="msg-btn" id="panelBtn">📋 ${self ? 'Kişisel panelim' : 'Kişi paneli'}</button></div>
     ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
     ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
   card.querySelector('.x').onclick = () => selectPerson(null);
   const mb = $('#msgBtn'); if (mb) mb.onclick = () => { selectPerson(null); openChat(id); };
+  $('#panelBtn').onclick = () => { selectPerson(null); pano.show('me', id); };
   preview?.dispose(); preview = null;
   const pf = $('#profForm');
   if (pf) {
@@ -517,7 +521,7 @@ function renderTasks() {
     const asg = ed ? `<select class="asg" data-id="${t.id}"><option value="">Atanmamış</option>${people.map((p) => `<option value="${esc(p.id)}" ${p.id === t.assignee ? 'selected' : ''}>${esc(p.display_name)}</option>`).join('')}</select>`
       : `<span>👤 ${esc(t.assignee ? nameOf(t.assignee) : 'Atanmamış')}</span>`;
     return `<li class="${t.state === 'bitti' ? 'done' : ''}">
-      <button class="st ${t.state}" data-id="${t.id}" ${ed ? '' : 'disabled'} title="${TASK_STATES[t.state].label} → ${TASK_STATES[TASK_STATES[t.state].next].label}">${t.state === 'bitti' ? '✓' : t.state === 'suruyor' ? '▶' : ''}</button>
+      <button class="st ${t.state}" data-id="${t.id}" ${ed ? '' : 'disabled'} title="${TASK_STATES[t.state].label} → ${TASK_STATES[TASK_STATES[t.state].next].label}">${t.state === 'bitti' ? '✓' : t.state === 'suruyor' ? '▶' : t.state === 'engel' ? '⛔' : ''}</button>
       <div><div class="tt" data-open="${t.id}">${t.priority === 1 ? '<span class="p1">❗</span> ' : ''}${esc(t.title)}</div>
         <div class="meta">${asg}${t.due_date ? `<span class="${late ? 'late' : ''}">📅 ${fmtDate(t.due_date)}${late ? ' (gecikti)' : ''}</span>` : ''}
         <span>${TASK_STATES[t.state].label}</span>${t.created_by !== t.assignee ? `<span>✍️ ${esc(nameOf(t.created_by))}</span>` : ''}${ext ? ext.taskMeta(t) : ''}</div></div>
@@ -558,7 +562,8 @@ $('#taskForm [name=due_date]').value = todayStr();
 $('#taskForm').onsubmit = (e) => {
   e.preventDefault(); const f = new FormData(e.target);
   const task = { title: f.get('title').trim(), kind: f.get('kind'), assignee: f.get('assignee') || null,
-    due_date: f.get('due_date') || null, priority: Number(f.get('priority')), category: (f.get('category') || '').trim() || null };
+    due_date: f.get('due_date') || null, priority: Number(f.get('priority')), category: (f.get('category') || '').trim() || null,
+    project_id: Number(f.get('project_id')) || null, hours: f.get('hours') ? Number(f.get('hours')) : null };
   if (!task.title) return;
   guard(async () => { await api.addTask(task); e.target.title.value = ''; e.target.title.focus(); ext.renderCatList(); });
 };
@@ -570,8 +575,18 @@ $$('#mobileTabs button[data-panel]').forEach((b) => b.onclick = () => {
   $$('.panel').forEach((x) => x.classList.remove('open')); if (open) p.classList.add('open');
 });
 
+// Üst çubuğun yüksekliği değiştikçe (satır kaydığında) paneller ve sayfa altına yerleşsin
+new ResizeObserver(() => document.documentElement.style.setProperty('--tb', $('#topbar').offsetHeight + 'px')).observe($('#topbar'));
+
 // ---------------------------------------------------------------- Genişletilmiş özellikler
-ext = initExt({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, hhmm, fmtDate, todayStr, canEdit, canDelete, renderTasks, renderTeam } });
+ext = initExt({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, hhmm, fmtDate, todayStr, canEdit, canDelete, renderTasks: () => { renderTasks(); pano?.render(); }, renderTeam,
+  projectOf: (id) => pano?.project(id), projects: () => pano?.projects || [] } });
+pano = initPano({ api, S, office, h: { $, $$, esc, toast, guard, nameOf, todayStr, renderTasks: () => { renderTasks(); renderTaskFormProjects(); }, openTask: (id) => ext.openTask(id), leaveToday: (id) => ext.leaveToday(id) } });
+function renderTaskFormProjects() {
+  const sel = $('#taskForm [name=project_id]'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Proje (isteğe bağlı)</option>' + pano.projects.filter((p) => p.status !== 'tamamlandi').map((p) => `<option value="${p.id}" ${String(p.id) === cur ? 'selected' : ''}>${esc(p.code)} · ${esc(p.name)}</option>`).join('');
+}
 
 // ---------------------------------------------------------------- Açılış
 (async () => {

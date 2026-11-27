@@ -22,6 +22,7 @@
   <!-- Üst çubuk -->
   <header id="topbar" hidden>
     <div class="brand">🏢 <b>Ofis 3D</b> <span id="demoTag" class="tag" hidden>DEMO</span></div>
+    <div id="viewSw" class="view-sw" role="tablist"><button data-v="office" class="active" title="3D ofis">🏢<span> Ofis</span></button><button data-v="pano" title="Proje panosu">📋<span> Pano</span></button><button data-v="me" title="Kişisel panelim">👤<span> Benim</span></button></div>
     <div id="statusPicker" class="status-picker" role="group" aria-label="Durumum"></div>
     <input id="statusNote" class="note" maxlength="80" placeholder="Not (ör. Müşteri ziyareti)" />
     <div id="moodPicker" class="mood-picker" role="group" aria-label="Duygu durumum"></div>
@@ -61,6 +62,7 @@
         <input name="due_date" type="date" />
         <select name="priority"><option value="1">Yüksek</option><option value="2" selected>Normal</option><option value="3">Düşük</option></select>
       </div>
+      <div class="row"><select name="project_id"><option value="">Proje (isteğe bağlı)</option></select><input name="hours" type="number" min="0" max="99" step="0.5" placeholder="Saat" /></div>
       <input name="category" list="catList" maxlength="40" placeholder="Kategori (isteğe bağlı, ör. Hat 3 retrofit)" />
       <button type="submit" class="primary">Ekle</button>
     </form>
@@ -78,6 +80,9 @@
       <button class="primary" type="submit">Gönder</button>
     </form>
   </section>
+
+  <!-- Pano / kişisel panel (3D'nin üstünde tam sayfa) -->
+  <main id="page" class="page" hidden></main>
 
   <!-- Kişi kartı -->
   <div id="personCard" class="card" hidden></div>

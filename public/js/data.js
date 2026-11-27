@@ -2,7 +2,7 @@
 // SupabaseBackend (gerçek) ve DemoBackend (yerel, sekmeler arası) aynı metotları sunar.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
-export const EXT_TABLES = ['task_comments', 'task_followers', 'task_attachments', 'room_bookings', 'leaves', 'task_templates'];
+export const EXT_TABLES = ['task_comments', 'task_followers', 'task_attachments', 'room_bookings', 'leaves', 'task_templates', 'projects', 'actions', 'checkins'];
 const todayStr = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD yerel saat
 
 // ---------------------------------------------------------------- Supabase
@@ -112,6 +112,7 @@ export class SupabaseBackend {
     Object.entries(typeof match === 'object' ? match : { id: match }).forEach(([k, v]) => { x = x.eq(k, v); });
     const { error } = await x; if (error) throw this._err(error);
   }
+  async upsert(table, row, onConflict) { const { error } = await this.sb.from(table).upsert(row, { onConflict }); if (error) throw this._err(error); }
   async rpc(fn, args = {}) { const { data, error } = await this.sb.rpc(fn, args); if (error) throw this._err(error); return data; }
   _err(e) {
     if (e.code === '23P01') return new Error('Bu saat aralığında oda zaten dolu');
@@ -205,7 +206,7 @@ export class DemoBackend {
         { skin: '#eabf98', hair: 'kisa', hairColor: '#b3392f', extra: 'sapka' }];
       db = { seq: 100, profiles: [], tasks: [], activity: [] };
       DEMO_PEOPLE.forEach(([n, c], i) => db.profiles.push({
-        id: 'bot' + i, display_name: n, color: c, desk_no: [101, 2, 11, 17, 18, 103, 13][i], status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
+        id: 'bot' + i, display_name: n, color: c, desk_no: [101, 2, 11, 17, 18, 103, 13][i], role: ['mudur', 'calisan', 'calisan', 'calisan', 'calisan', 'yonetici', 'calisan'][i], dept: ['Proje Müdürü', 'Tasarım Mühendisi', 'Proses Mühendisi', 'Otomasyon Mühendisi', 'Kalite / APQP', 'Proje Planlama', 'Satın Alma'][i], capacity: 8, status: st[i], status_note: '', mood: moods[i], avatar: looks[i],
         is_admin: false, updated_at: now, created_at: now, bot: true,
       }));
       const titles = ['Teklif dosyasını hazırla', 'Haftalık rapor', 'Müşteri toplantısı notları', 'PLC yedeklerini al',
@@ -215,8 +216,24 @@ export class DemoBackend {
         state: ['bekliyor', 'suruyor', 'bekliyor'][i % 3], priority: (i % 3) + 1,
         assignee: 'bot' + (i % 7), created_by: 'bot' + (i % 7),
         due_date: i % 3 === 2 ? new Date(Date.now() + (i + 1) * 864e5).toLocaleDateString('sv-SE') : todayStr(),
-        done_at: null, created_at: now, updated_at: now,
+        done_at: null, created_at: now, updated_at: now, project_id: 1 + (i % 3), hours: [2, 4, 3, 6, 1.5, 3, 2, 5][i],
       }));
+      const d = (n) => new Date(Date.now() + n * 864e5).toLocaleDateString('sv-SE');
+      db.tables = {
+        projects: [
+          { id: 1, code: 'PRJ-2401', name: 'Hat 3 retrofit', customer: 'İç proje', lead: 'bot0', phase: 3, status: 'aktif', due: d(40), color: '#3b6fe0', created_by: 'bot0', created_at: now },
+          { id: 2, code: 'PRJ-2405', name: 'Robotlu kaynak hücresi', customer: 'Anadolu Otomotiv', lead: 'bot5', phase: 1, status: 'aktif', due: d(75), color: '#2ec27e', created_by: 'bot0', created_at: now },
+          { id: 3, code: 'PRJ-2409', name: 'MES entegrasyonu', customer: 'İç proje', lead: 'bot3', phase: 4, status: 'aktif', due: d(-3), color: '#f6a623', created_by: 'bot0', created_at: now },
+        ],
+        actions: [
+          { id: 21, project_id: 1, problem: 'Servo sürücü haberleşme hatası (EtherCAT)', countermeasure: 'Kablo ekranlaması ve topraklama kontrolü', owner: 'bot3', due: d(-1), pdca: 1, opened: d(-6), created_by: 'bot0', created_at: now },
+          { id: 22, project_id: 2, problem: 'Müşteri Rev C onayı gecikiyor', countermeasure: 'Haftalık onay toplantısı', owner: 'bot0', due: d(3), pdca: 0, opened: d(-4), created_by: 'bot0', created_at: now },
+          { id: 23, project_id: 3, problem: 'Çevrim süresi hedefin %8 üstünde', countermeasure: 'Robot yol optimizasyonu, bekleme sürelerinin azaltılması', owner: 'bot2', due: d(5), pdca: 2, opened: d(-9), created_by: 'bot5', created_at: now },
+        ],
+        checkins: [{ user_id: 'bot0', day: todayStr(), note: '' }, { user_id: 'bot2', day: todayStr(), note: '' }],
+      };
+      db.tasks.push({ id: ++db.seq, title: 'Pres bakımda, deneme yapılamıyor', notes: '', kind: 'gunluk', state: 'engel', block_reason: 'Pres bakımda (Çarşamba dönüyor)', priority: 1, assignee: 'bot2', created_by: 'bot2', due_date: todayStr(), done_at: null, created_at: now, updated_at: now, project_id: 1, hours: 2 });
+      db.tasks.push({ id: ++db.seq, title: 'Tolerans analizi', notes: '', kind: 'gunluk', state: 'bitti', priority: 2, assignee: 'bot1', created_by: 'bot1', due_date: d(-1), done_at: new Date(Date.now() - 864e5).toISOString(), created_at: now, updated_at: now, project_id: 2, hours: 3 });
       this._save(db);
     }
     return db;
@@ -332,13 +349,22 @@ export class DemoBackend {
   async insert(table, row) {
     const db = this._db(), t = this._t(db, table);
     const defaults = { task_comments: { author: this.user.id }, task_attachments: { uploaded_by: this.user.id }, task_templates: { created_by: this.user.id, active: true },
-      room_bookings: { booked_by: this.user.id, room: 'toplanti' }, leaves: { user_id: this.user.id, kind: 'yillik' } }[table] || {};
-    const r = { ...(table === 'task_followers' ? {} : { id: ++db.seq }), ...defaults, ...row, created_at: new Date().toISOString() };
+      room_bookings: { booked_by: this.user.id, room: 'toplanti' }, leaves: { user_id: this.user.id, kind: 'yillik' },
+      projects: { created_by: this.user.id, phase: 0, status: 'aktif', color: '#3b6fe0' },
+      actions: { created_by: this.user.id, pdca: 0, opened: todayStr() }, checkins: { user_id: this.user.id, day: todayStr() } }[table] || {};
+    const r = { ...(['task_followers', 'checkins'].includes(table) ? {} : { id: ++db.seq }), ...defaults, ...row, created_at: new Date().toISOString() };
+    if (table === 'projects' && t.some((x) => x.code === r.code)) throw new Error('Bu proje kodu zaten var');
     if (table === 'room_bookings' && t.some((b) => b.room === r.room && b.starts_at < r.ends_at && r.starts_at < b.ends_at)) throw new Error('Bu saat aralığında oda zaten dolu');
     if (table === 'task_followers' && t.some((f) => f.task_id === r.task_id && f.user_id === r.user_id)) throw new Error('Bu kayıt zaten var');
     t.push(r); this._save(db);
     this._emit({ t: 'table', table, c: { type: 'INSERT', row: r } });
     return r;
+  }
+  async upsert(table, row, onConflict) {
+    const keys = onConflict.split(','), db = this._db(), t = this._t(db, table);
+    const ex = t.find((r) => keys.every((k) => r[k] === row[k]));
+    if (ex) return this.update(table, Object.fromEntries(keys.map((k) => [k, row[k]])), row);
+    return this.insert(table, row);
   }
   async update(table, match, patch) {
     const db = this._db();
@@ -380,6 +406,7 @@ export class DemoBackend {
       case 'set_admin': if (p) this._updProfile(p.id, { is_admin: !!b.is_admin }); return { ok: true };
       case 'set_desk': if (p) this._updProfile(p.id, { desk_no: b.desk_no ? Number(b.desk_no) : null }); return { ok: true };
       case 'set_name': if (p) this._updProfile(p.id, { display_name: b.display_name }); return { ok: true };
+      case 'set_profile': if (p) { const x = {}; ['role', 'dept', 'capacity', 'display_name'].forEach((k) => { if (b[k] !== undefined) x[k] = k === 'capacity' ? Number(b[k]) : b[k]; }); this._updProfile(p.id, x); } return { ok: true };
       case 'rotate_invite': return { invite_code: 'YENI-DEMO' };
       default: return { ok: true };
     }
