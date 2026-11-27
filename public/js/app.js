@@ -63,7 +63,7 @@ async function start() {
   if (!meP()) { authErr('Profil bulunamadı. Yöneticiye başvurun.'); await api.signOut(); return; }
   S.started = true;
   $('#auth').hidden = true;
-  ['#topbar', '#teamPanel', '#taskPanel', '#mobileTabs'].forEach((s) => $(s).hidden = false);
+  ['#topbar', '#teamPanel', '#taskPanel', '#mobileTabs', '#fitBtnDesk'].forEach((s) => $(s).hidden = false);
   buildStatusPicker(); renderMe(); renderFloors();
   if (!meP().avatar || !Object.keys(meP().avatar).length) { selectPerson(S.me, false); toast('👋 Hoş geldin! Önce avatarını oluştur.'); }
   api.subscribe({
@@ -190,6 +190,7 @@ function selectPerson(id, focus = true) {
   if (!id || !S.profiles.has(id)) { card.hidden = true; S.selected = null; preview?.dispose(); preview = null; renderTeam(); return; }
   const p = S.profiles.get(id), s = STATUSES[p.status] ?? STATUSES.musait;
   if (focus) office.focus(id);
+  if (window.innerWidth <= 900) $$('.panel').forEach((x) => x.classList.remove('open'));
   const tasks = [...S.tasks.values()].filter((t) => t.assignee === id && t.state !== 'bitti');
   const self = id === S.me;
   const takenDesks = new Set([...S.profiles.values()].filter((x) => x.id !== id).map((x) => x.desk_no));
@@ -309,7 +310,8 @@ $('#taskForm').onsubmit = (e) => {
 };
 
 // ---------------------------------------------------------------- Mobil
-$$('#mobileTabs button').forEach((b) => b.onclick = () => {
+$('#fitBtn').onclick = $('#fitBtnDesk').onclick = () => { $$('.panel').forEach((x) => x.classList.remove('open')); office.fitView(); };
+$$('#mobileTabs button[data-panel]').forEach((b) => b.onclick = () => {
   const p = $('#' + b.dataset.panel), open = !p.classList.contains('open');
   $$('.panel').forEach((x) => x.classList.remove('open')); if (open) p.classList.add('open');
 });
