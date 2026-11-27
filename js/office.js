@@ -133,12 +133,47 @@ const PROPS = {
       const seat = { x: x + side * 1.2, z, face: side < 0 ? Math.PI / 2 : -Math.PI / 2, sit: true };
       G.add(chair(seat.x + side * 0.05, z, seat.face));
       const num = floorText(String(n), x + side * 0.6, z - 0.55, 0.16, 'rgba(60,70,90,0.55)'); num.position.y = 0.768; G.add(num);
-      ctx.desks.push({ no: n++, seat });
+      ctx.desks.push({ no: n, seat, name: p.group ? `${p.group} · ${n - p.deskStart + 1}` : `Masa ${n}` }); n++;
     }
   },
+  singleDesks(G, p, ctx) {
+    const m = mats();
+    for (let i = 0; i < p.count; i++) {
+      const x = p.x - (p.count - 1) * 0.75 + i * 1.5, z = p.z, no = p.deskStart + i;
+      G.add(box(1.4, 0.05, 0.75, m.top, x, 0.74, z));
+      [-0.65, 0.65].forEach((dx) => [-0.3, 0.3].forEach((dz) => G.add(box(0.05, 0.74, 0.05, m.leg, x + dx, 0.37, z + dz))));
+      G.add(box(0.56, 0.34, 0.04, m.scr, x, 1.04, z - 0.15), box(0.04, 0.18, 0.04, m.leg, x, 0.84, z - 0.17), box(0.42, 0.012, 0.16, m.key, x, 0.775, z + 0.1));
+      const sc = mesh(new THREE.PlaneGeometry(0.52, 0.3), m.scrOn, x, 1.04, z - 0.128, false); G.add(sc);
+      const seat = { x, z: z + 0.85, face: Math.PI, sit: true };
+      G.add(chair(x, seat.z + 0.05, seat.face));
+      ctx.desks.push({ no, seat, name: p.group ? `${p.group} · tekli ${i + 1}` : `Masa ${no}` });
+    }
+    ctx.obstacles.push([p.x, p.z, p.count * 1.5, 0.75]);
+  },
+  execDesk(G, p, ctx) {
+    const m = mats(), r = (p.face ?? 0) - Math.PI, g = new THREE.Group();
+    g.position.set(p.x, 0, p.z); g.rotation.y = r;
+    const wood = M('#6b4f3a', { roughness: 0.5 });
+    g.add(box(1.9, 0.06, 0.9, wood, 0, 0.75, 0), box(0.06, 0.72, 0.85, wood, -0.9, 0.36, 0), box(0.06, 0.72, 0.85, wood, 0.9, 0.36, 0), box(1.8, 0.45, 0.04, wood, 0, 0.5, -0.4));
+    g.add(box(0.6, 0.36, 0.04, m.scr, 0.25, 1.05, -0.25), box(0.04, 0.2, 0.04, m.leg, 0.25, 0.86, -0.27), box(0.42, 0.012, 0.16, m.key, 0.25, 0.79, 0.1));
+    const sc = mesh(new THREE.PlaneGeometry(0.56, 0.32), m.scrOn, 0.25, 1.05, -0.228, false); g.add(sc);
+    g.add(box(0.3, 0.04, 0.22, M('#f2f2f2'), -0.5, 0.79, 0.05));   // dosya
+    const ec = chair(0, 0.95, Math.PI); ec.scale.setScalar(1.15); g.add(ec);
+    for (let i = 0; i < (p.guests ?? 0); i++) g.add(chair((i - ((p.guests ?? 1) - 1) / 2) * 0.8, -1.0, 0));
+    G.add(g);
+    const seat = { x: p.x + 0.9 * Math.sin(r), z: p.z + 0.9 * Math.cos(r), face: p.face ?? 0, sit: true };
+    ctx.desks.push({ no: p.deskNo, seat, name: p.name || `Masa ${p.deskNo}` });
+    const side = Math.abs(Math.sin(r)) > 0.5;
+    ctx.obstacles.push([p.x, p.z, side ? 0.9 : 1.9, side ? 1.9 : 0.9]);
+  },
   lockers(G, p, ctx) {
-    const m = mats(); G.add(box(p.w, 1.0, p.d, m.yel, p.x, 0.5, p.z));
-    for (let i = 1; i < Math.round(p.w / 0.8); i++) G.add(box(0.02, 0.9, p.d + 0.02, m.yelD, p.x - p.w / 2 + 0.8 * i, 0.5, p.z));
+    const m = mats(), alongZ = p.d > p.w, L = alongZ ? p.d : p.w;
+    G.add(box(p.w, 1.0, p.d, m.yel, p.x, 0.5, p.z));
+    for (let i = 1; i < Math.round(L / 0.8); i++) {
+      const o = -L / 2 + (L / Math.round(L / 0.8)) * i;
+      G.add(alongZ ? box(p.w + 0.02, 0.9, 0.02, m.yelD, p.x, 0.5, p.z + o) : box(0.02, 0.9, p.d + 0.02, m.yelD, p.x + o, 0.5, p.z));
+    }
+    G.add(box(alongZ ? p.w + 0.02 : L, 0.02, alongZ ? L : p.d + 0.02, m.yelD, p.x, 0.5, p.z));
     ctx.obstacles.push([p.x, p.z, p.w, p.d]);
   },
   column(G, p, ctx) { G.add(box(0.6, 2.6, 0.6, mats().col, p.x, 1.3, p.z)); ctx.obstacles.push([p.x, p.z, 0.6, 0.6]); },
@@ -166,8 +201,9 @@ const PROPS = {
     ctx.obstacles.push([p.x, p.z, p.w, p.d]);
   },
   bistro(G, p, ctx) {
-    const m = mats(); G.add(mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.04, 24), m.white, p.x, 1.0, p.z), mesh(new THREE.CylinderGeometry(0.04, 0.12, 1.0, 10), m.grey, p.x, 0.5, p.z));
-    ctx.obstacles.push([p.x, p.z, 0.9, 0.9]);
+    const m = mats(), h = p.low ? 0.55 : 1.0, r = p.low ? 0.32 : 0.45;
+    G.add(mesh(new THREE.CylinderGeometry(r, r, 0.04, 24), m.white, p.x, h, p.z), mesh(new THREE.CylinderGeometry(0.04, 0.12, h, 10), m.grey, p.x, h / 2, p.z));
+    ctx.obstacles.push([p.x, p.z, 2 * r, 2 * r]);
   },
   sofa(G, p, ctx) { const m = mats(); G.add(box(p.w, 0.42, 0.7, m.sofa, p.x, 0.21, p.z), box(p.w, 0.5, 0.18, m.sofa, p.x, 0.6, p.z + 0.3)); ctx.obstacles.push([p.x, p.z, p.w, 0.7]); },
   plant(G, p) { const m = mats(); G.add(mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.4, 12), m.pot, p.x, 0.2, p.z), mesh(new THREE.IcosahedronGeometry(0.42, 0), m.leaf, p.x, 0.75, p.z)); },
@@ -321,6 +357,7 @@ export class Office {
   }
 
   get floorList() { return FLOORS.map((f) => ({ id: f.id, name: f.name })); }
+  deskName(no) { return this.desks.get(no)?.name ?? (no ? `Masa ${no}` : '—'); }
   get deskNumbers() { return [...this.desks.keys()].sort((a, b) => a - b); }
 
   buildFloor(f) {
@@ -348,7 +385,7 @@ export class Office {
     }
     for (const z of f.zones || []) (z.spots || []).forEach((s) => this._addSpot(z.kind, f.id, s));
     (f.labels || []).forEach((t) => G.add(floorText(t.text, t.x, t.z, t.h)));
-    ctx.desks.forEach((d) => this.desks.set(d.no, { floor: f.id, seat: d.seat }));
+    ctx.desks.forEach((d) => this.desks.set(d.no, { floor: f.id, seat: d.seat, name: d.name }));
     this.floors.set(f.id, { def: f, group: G, grid: new Grid(f, ctx.obstacles), stairs: f.stairs, exit: f.exit });
   }
 
