@@ -177,3 +177,45 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
   input, select { font-size: 16px; } /* iOS'ta odaklanınca otomatik yakınlaştırmayı önler */
   .banner { bottom: calc(66px + env(safe-area-inset-bottom)); width: 92vw; text-align: center; font-size: 13px; }
 }
+
+/* ---------- Sohbet ---------- */
+.chat-btn { position: relative; font-size: 17px; padding: 4px 9px; border-radius: 999px; }
+.badge { position: absolute; top: -5px; right: -6px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; min-width: 17px; height: 17px; line-height: 17px; border-radius: 999px; padding: 0 4px; text-align: center; }
+.mobile-tabs button { position: relative; }
+.chat { position: fixed; right: 362px; bottom: 10px; width: 350px; height: min(520px, calc(100vh - 100px)); background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow); z-index: 6; display: flex; flex-direction: column; overflow: hidden; }
+.chat header { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.chat header b { font-size: 15px; }
+.chat header button { font-size: 20px; padding: 0 8px; line-height: 1; }
+.chat-list, .chat-thread { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; }
+.chat-list li { display: flex; align-items: center; gap: 9px; padding: 9px 8px; border-radius: 10px; cursor: pointer; position: relative; }
+.chat-list li:hover { background: #f1f4f8; }
+.chat-list .cl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-list .cl-main span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-list time { font-size: 11px; color: var(--muted); }
+.chat-list .badge { position: static; }
+.chat-list .on { color: var(--ok); font-size: 10px; }
+.chat-thread li { max-width: 82%; margin: 4px 0; padding: 7px 10px 5px; border-radius: 14px 14px 14px 4px; background: #f0f2f6; display: flex; flex-direction: column; word-break: break-word; }
+.chat-thread li.mine { margin-left: auto; background: var(--accent); color: #fff; border-radius: 14px 14px 4px 14px; }
+.chat-thread li .who { font-size: 11.5px; font-weight: 700; }
+.chat-thread li time { font-size: 10px; opacity: .65; align-self: flex-end; margin-top: 2px; }
+.chat-thread li.day { background: none; max-width: none; margin: 8px auto; font-size: 11px; color: var(--muted); padding: 0; }
+.chat-thread li.empty { background: none; max-width: none; color: var(--muted); text-align: center; margin: 30px auto; }
+.chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+.chat-form input { flex: 1; }
+.msg-btn { margin-top: 8px; width: 100%; }
+
+/* Konuşma balonu */
+.speech { max-width: 220px; background: #fff; color: var(--ink); font-size: 12.5px; padding: 6px 10px; border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,.18);
+  position: relative; pointer-events: none; white-space: normal; text-align: center; line-height: 1.3; }
+.speech::after { content: ''; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.speech.priv { font-size: 18px; padding: 3px 8px; }
+.speech.in { animation: pop .25s ease-out; }
+.speech.out { opacity: 0; transition: opacity .4s; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+
+@media (max-width: 900px) {
+  .chat { left: 8px; right: 8px; width: auto; bottom: calc(62px + env(safe-area-inset-bottom)); height: 66vh; border-radius: 14px; }
+  .chat-btn { display: none; }
+  .speech { font-size: 11.5px; max-width: 170px; }
+}

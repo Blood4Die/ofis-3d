@@ -542,6 +542,22 @@ export class Office {
     if (a.visible && !a.target?.hide) a.opacityGoal = online ? 1 : 0.35;
   }
   setTaskCount(id, n) { const a = this.avatars.get(id); if (!a) return; const b = a.el.querySelector('.al-badge'); b.hidden = !n; b.textContent = n; }
+  // Avatarın üstünde konuşma balonu (genel mesaj) ya da 💬 işareti (özel mesaj)
+  say(id, text, { private: priv = false, ms = 6500 } = {}) {
+    const a = this.avatars.get(id); if (!a || !a.visible) return;
+    if (!a.bubble) {
+      const el = document.createElement('div'); el.className = 'speech';
+      a.bubble = new CSS2DObject(el); a.bubble.center.set(0.5, 1); a.group.add(a.bubble);
+    }
+    const el = a.bubble.element;
+    el.textContent = priv ? '💬' : (text.length > 90 ? text.slice(0, 88) + '…' : text);
+    el.classList.toggle('priv', priv);
+    a.bubble.position.set(0, a.label.position.y + 0.55, 0);
+    a.bubble.visible = a.onFloor !== false;
+    el.classList.remove('out'); void el.offsetWidth; el.classList.add('in');
+    clearTimeout(a.bubbleT);
+    a.bubbleT = setTimeout(() => { el.classList.add('out'); setTimeout(() => { if (a.bubble) a.bubble.visible = false; }, 400); }, ms);
+  }
   setHighlight(id) { this.avatars.forEach((a, k) => a.el.classList.toggle('selected', k === id)); }
   focus(id) {
     const a = this.avatars.get(id); if (!a) return;

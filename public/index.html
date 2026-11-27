@@ -24,6 +24,7 @@
     <input id="statusNote" class="note" maxlength="80" placeholder="Not (ör. Müşteri ziyareti)" />
     <div id="moodPicker" class="mood-picker" role="group" aria-label="Duygu durumum"></div>
     <div class="spacer"></div>
+    <button id="chatBtn" class="chat-btn" title="Sohbet">💬<span id="chatBadge" class="badge" hidden></span></button>
     <span id="conn" class="conn" title="Bağlantı durumu">●</span>
     <span id="clock" class="clock"></span>
     <button id="meBtn" class="ghost" title="Profilim"></button>
@@ -61,6 +62,17 @@
     </form>
   </aside>
 
+  <!-- Sohbet -->
+  <section id="chatPanel" class="chat" hidden>
+    <header><button id="chatBack" class="ghost" hidden>‹</button><b id="chatTitle">Sohbet</b><span class="spacer"></span><button id="chatClose" class="ghost" title="Kapat">×</button></header>
+    <ul id="chatList" class="chat-list"></ul>
+    <ul id="chatThread" class="chat-thread" hidden></ul>
+    <form id="chatForm" class="chat-form" hidden autocomplete="off">
+      <input name="body" maxlength="500" placeholder="Mesaj yaz…" required />
+      <button class="primary" type="submit">Gönder</button>
+    </form>
+  </section>
+
   <!-- Kişi kartı -->
   <div id="personCard" class="card" hidden></div>
   <div id="floorTabs" class="floor-tabs" hidden></div>
@@ -72,6 +84,7 @@
   <div class="mobile-tabs" id="mobileTabs" hidden>
     <button data-panel="teamPanel">👥 Ekip</button>
     <button data-panel="taskPanel">✅ Görevler</button>
+    <button id="chatBtnM">💬<span id="chatBadgeM" class="badge" hidden></span></button>
     <button id="fitBtn" title="Görünümü sıfırla">🎯</button>
   </div>
 

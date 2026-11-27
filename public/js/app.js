@@ -11,7 +11,7 @@ const fmtDate = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('tr-TR', { 
 const isDemo = new URLSearchParams(location.search).has('demo');
 const api = isDemo ? new DemoBackend() : new SupabaseBackend();
 
-const S = { me: null, profiles: new Map(), tasks: new Map(), online: new Set(), tab: 'bugun', onlyMine: false, selected: null, started: false };
+const S = { msgs: [], chatOpen: false, chatWith: null, me: null, profiles: new Map(), tasks: new Map(), online: new Set(), tab: 'bugun', onlyMine: false, selected: null, started: false };
 const office = new Office($('#scene'), { onAvatarClick: (id) => selectPerson(id), onFloorsChanged: () => renderFloors() });
 let preview = null;
 
@@ -23,6 +23,7 @@ const canDelete = (t) => { const m = meP(); return !!m && (t.created_by === S.me
 function toast(msg) {
   const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
   $('#toasts').appendChild(el); setTimeout(() => el.remove(), 4200);
+  return el;
 }
 async function guard(fn) {
   try { await fn(); } catch (e) { console.error(e); toast('⚠️ ' + (e.message || 'İşlem başarısız')); }
@@ -69,6 +70,7 @@ async function start() {
   api.subscribe({
     onProfile: onProfileChange, onTask: onTaskChange, onActivity: (row) => addFeed(row, true),
     onPresence: (set) => { S.online = set; refreshOnline(); },
+    onMessage: onMessage,
     onConnection: (state, wasReconnect) => {
       $('#conn').classList.toggle('off', state !== 'online');
       $('#offlineBanner').hidden = state === 'online';
@@ -86,6 +88,8 @@ async function reloadAll(animate) {
   S.tasks = new Map(data.tasks.map((t) => [t.id, t]));
   S.profiles.forEach((p) => office.upsertPerson(p, { animate, online: S.online.has(p.id), openTasks: openCount(p.id), isMe: p.id === S.me }));
   $('#feed').innerHTML = ''; data.activity.forEach((r) => addFeed(r, false));
+  try { S.msgs = await api.loadMessages(); } catch (e) { console.error(e); }
+  renderChat();
   renderTeam(); renderTasks(); renderAssigneeSelect();
 }
 
@@ -198,10 +202,12 @@ function selectPerson(id, focus = true) {
     <h4><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.display_name)}
       <span class="chip" style="background:${s.color}">${s.icon} ${s.label}</span></h4>
     <div class="muted small">${MOODS[p.mood || 'normal'].icon} ${MOODS[p.mood || 'normal'].label} · ${p.status_note ? esc(p.status_note) + ' · ' : ''}${esc(office.deskName(p.desk_no))} · ${S.online.has(id) ? 'çevrimiçi' : 'çevrimdışı'} · son güncelleme ${hhmm(p.updated_at)}</div>
+    ${!self ? `<button class="primary msg-btn" id="msgBtn">💬 Mesaj gönder</button>` : ''}
     ${tasks.length ? `<ul>${tasks.map((t) => `<li>${t.state === 'suruyor' ? '▶️' : '⏳'} ${esc(t.title)}${t.due_date ? ` <span class="muted small">${fmtDate(t.due_date)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted small">Açık görevi yok.</p>'}
     ${self ? editorHtml(p, takenDesks) : ''}`;
   card.hidden = false;
   card.querySelector('.x').onclick = () => selectPerson(null);
+  const mb = $('#msgBtn'); if (mb) mb.onclick = () => { selectPerson(null); openChat(id); };
   preview?.dispose(); preview = null;
   const pf = $('#profForm');
   if (pf) {
@@ -238,6 +244,90 @@ function editorHtml(p, takenDesks) {
         `<option value="${n}" ${n === p.desk_no ? 'selected' : ''} ${takenDesks.has(n) ? 'disabled' : ''}>${esc(office.deskName(n))}${takenDesks.has(n) ? ' (dolu)' : ''}</option>`).join('')}</select></div>
       <button class="primary" type="submit">Kaydet</button>
     </div></form>`;
+}
+
+// ---------------------------------------------------------------- Sohbet
+const READ_KEY = () => 'ofis3d-read-' + S.me;
+const lastRead = () => { try { return JSON.parse(localStorage.getItem(READ_KEY()) || '{}'); } catch { return {}; } };
+function markRead(key) { const r = lastRead(); r[key] = new Date().toISOString(); try { localStorage.setItem(READ_KEY(), JSON.stringify(r)); } catch {} }
+const convKey = (m) => (m.recipient ? (m.sender === S.me ? m.recipient : m.sender) : 'genel');
+function unreadCount(key) {
+  const r = lastRead()[key] || '1970';
+  return S.msgs.filter((m) => convKey(m) === key && m.sender !== S.me && m.created_at > r).length;
+}
+function updateBadges() {
+  const keys = ['genel', ...S.profiles.keys()].filter((k) => k !== S.me);
+  const total = keys.reduce((n, k) => n + unreadCount(k), 0);
+  [['#chatBadge'], ['#chatBadgeM']].forEach(([sel]) => { const b = $(sel); b.hidden = !total; b.textContent = total > 99 ? '99+' : total; });
+}
+function openChat(key) {
+  S.chatOpen = true; S.chatWith = key ?? null;
+  $('#chatPanel').hidden = false;
+  if (window.innerWidth <= 900) $$('.panel').forEach((x) => x.classList.remove('open'));
+  renderChat();
+  if (S.chatWith) setTimeout(() => $('#chatForm [name=body]').focus(), 50);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') renderChat(); });
+function closeChat() { S.chatOpen = false; $('#chatPanel').hidden = true; }
+$('#chatBtn').onclick = $('#chatBtnM').onclick = () => (S.chatOpen ? closeChat() : openChat(null));
+$('#chatClose').onclick = closeChat;
+$('#chatBack').onclick = () => { S.chatWith = null; renderChat(); };
+$('#chatForm').onsubmit = (e) => {
+  e.preventDefault();
+  const inp = e.target.body, body = inp.value.trim(); if (!body || !S.chatWith) return;
+  inp.value = '';
+  guard(() => api.sendMessage(S.chatWith === 'genel' ? null : S.chatWith, body));
+};
+
+function renderChat() {
+  if (!S.me) return;
+  updateBadges();
+  if (!S.chatOpen) return;
+  const list = $('#chatList'), thread = $('#chatThread'), form = $('#chatForm');
+  const inThread = !!S.chatWith;
+  list.hidden = inThread; thread.hidden = form.hidden = !inThread; $('#chatBack').hidden = !inThread;
+  if (!inThread) {
+    $('#chatTitle').textContent = 'Sohbet';
+    const last = {}; S.msgs.forEach((m) => { last[convKey(m)] = m; });
+    const people = [...S.profiles.values()].filter((p) => p.id !== S.me)
+      .sort((a, b) => (last[b.id]?.created_at || '').localeCompare(last[a.id]?.created_at || '') || a.display_name.localeCompare(b.display_name, 'tr'));
+    const row = (key, title, dot, sub) => {
+      const n = unreadCount(key), lm = last[key];
+      return `<li data-k="${esc(key)}"><span class="dot" style="background:${dot}"></span><div class="cl-main"><b>${title}</b>
+        <span class="muted">${lm ? esc((lm.sender === S.me ? 'Sen: ' : (key === 'genel' ? nameOf(lm.sender) + ': ' : '')) + lm.body) : sub}</span></div>
+        ${lm ? `<time>${hhmm(lm.created_at)}</time>` : ''}${n ? `<span class="badge">${n}</span>` : ''}</li>`;
+    };
+    list.innerHTML = row('genel', '📢 Genel (herkes)', '#1d2433', 'Herkese mesaj gönder') +
+      people.map((p) => row(p.id, esc(p.display_name) + (S.online.has(p.id) ? ' <span class="on">●</span>' : ''), esc(p.color), STATUSES[p.status]?.label ?? '')).join('');
+    $$('#chatList li').forEach((li) => li.onclick = () => openChat(li.dataset.k));
+    return;
+  }
+  const key = S.chatWith;
+  $('#chatTitle').textContent = key === 'genel' ? '📢 Genel sohbet' : nameOf(key);
+  const msgs = S.msgs.filter((m) => convKey(m) === key);
+  let prevDay = '';
+  thread.innerHTML = msgs.length ? msgs.map((m) => {
+    const mine = m.sender === S.me, d = new Date(m.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+    const sep = d !== prevDay ? `<li class="day">${d}</li>` : ''; prevDay = d;
+    return `${sep}<li class="${mine ? 'mine' : ''}">${!mine && key === 'genel' ? `<span class="who" style="color:${esc(S.profiles.get(m.sender)?.color || '#555')}">${esc(nameOf(m.sender))}</span>` : ''}
+      <span class="txt">${esc(m.body)}</span><time>${hhmm(m.created_at)}</time></li>`;
+  }).join('') : '<li class="empty">Henüz mesaj yok. İlk mesajı sen yaz 👋</li>';
+  thread.scrollTop = thread.scrollHeight;
+  markRead(key); updateBadges();
+}
+
+function onMessage(m) {
+  if (S.msgs.some((x) => x.id === m.id)) return;
+  S.msgs.push(m); if (S.msgs.length > 600) S.msgs.shift();
+  const key = convKey(m), mine = m.sender === S.me;
+  if (!m.recipient) office.say(m.sender, m.body);
+  else if (!mine) office.say(m.sender, '', { private: true, ms: 4000 });
+  const viewing = S.chatOpen && S.chatWith === key && document.visibilityState === 'visible';
+  if (!mine && !viewing && m.recipient === S.me) {
+    const t = toast(`💬 ${nameOf(m.sender)}: ${m.body.slice(0, 80)}`);
+    if (t) { t.style.pointerEvents = 'auto'; t.style.cursor = 'pointer'; t.onclick = () => openChat(key); }
+  }
+  renderChat();
 }
 
 // ---------------------------------------------------------------- Görevler
